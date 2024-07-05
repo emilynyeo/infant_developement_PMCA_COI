@@ -1,0 +1,599 @@
+---
+title: "2.cleaning_input_data"
+author: "Emily Yeo"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Load packages
+
+```{r}
+#clear environment
+rm(list = ls())
+# load packages 
+pacman::p_load(knitr, tidyverse, magrittr, lme4, lmerTest, GGally, corrplot, 
+               Hmisc, kableExtra, dplyr, plyr, janitor, lubridate, survminer, 
+               ggplot2, here, readr, readxl)
+```
+
+# Table 1 (main demographics)
+
+```{r warning=FALSE}
+#set to files directory
+setwd("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/rawdata")
+# Table 1 Unique Patient info ####
+Table_1 <- read.csv("Table1_UniquePatients_0615.csv",               
+                    na = c("NA", "don't know", "","    .",
+                           "Missing: Not provided",999.00)) %>%
+            dplyr::rename(Research_ID = "Research.ID",
+                          DOB = "Date.of.Birth",
+                          Sex = "Gender",
+                          Race = "Race.At.First.Encounter",
+                          Ethnicity = "Ethnicity.At.First.Encounter",
+                          Language = "Preferred.Language.At.First.Encounter",
+                          DateOfFirstHRIFVisit = "Date.Of.First.HRIF.Visit",
+                          DateOfLastHRIFVisit = "Date.Of.Last.HRIF.Visit",
+                          Gestational_Age1 = "Gestational.Age",
+                          Gestational_Age_Date = "Gestational.Age.Date",
+                          first_bayleys_age ="Age.at.First.Bayley.in.Months")
+
+# Variable selection
+Table_1 <- Table_1[ , c("Research_ID","DOB","Sex","Race","Ethnicity",
+                        "Language",
+                        "first_bayleys_age",
+                        "DateOfFirstHRIFVisit",
+                        "DateOfLastHRIFVisit", 
+                        "Gestational_Age1")]
+# Total Infants: 1561
+length(unique(Table_1$Research_ID))
+```
+
+### Recode race and ethnicity 
+This is shown in supplementary table 1. 
+
+```{r}
+Table_1 <- Table_1 %>% 
+  mutate(V3_RACE = case_when(Ethnicity == "Hispanic or Latino" ~ "Hispanic or Latino",
+                             Ethnicity == "Hispanic" ~ "Hispanic or Latino",
+                             Ethnicity == "Latino" ~ "Hispanic or Latino",
+                             Race == "Mexican/Mexican-American, Chican(x)" ~ "Hispanic or Latino",
+                             Race == "Other Latin(x) and/or Hispanic" ~ "Hispanic or Latino",
+                             Race == "Latino/a/x and/or Hispanic" ~ "Hispanic or Latino",
+                             Race == "Chinese" ~ "Asian or Pacific Islander",
+                             Race == "Other Asian" ~ "Asian or Pacific Islander",
+                             Race == "Native Hawaiian" ~ "Asian or Pacific Islander",
+                             Race == "Filipino" ~ "Asian or Pacific Islander",
+                             Race == "Asian/Pacific" ~ "Asian or Pacific Islander",
+                             Race == "Asian" ~ "Asian or Pacific Islander",
+                             Race == "Native American" ~ "American Indian or Alaska Native",
+                             Race == "African" ~ "Black or African American",
+                             Race == "Other Black and/or African American" ~ "Black or African American",
+                             Race == "Black and/or African American" ~ "Black or African American",
+                             Race == "Middle Eastern and/or North African"	~ "Middle Eastern or North African",
+                             Race == "Armenian" ~ "White",
+                             Race == "White" ~ "White",
+                             Race == "Other White" ~ "White",
+                             Race == "Other" ~ "Other Race",
+                             Race == "Declines to State" ~ "Nonconforming data",
+                             Race == "None Specified" ~ "Nonconforming data",
+                             Race == "Unknown" ~ "Nonconforming data"))
+
+table(Table_1$V3_RACE)
+# how many "other race" and hispanic ethnicity
+filtered_data <- subset(Table_1, Race == "Other" & Ethnicity == "Hispanic or Latino")
+count_rows <- nrow(filtered_data)
+print(count_rows) # No instances of Race being Other & Ethnicity being Hispanic or Latino 
+```
+
+# Gestational Age Data
+This was given later, in addition to the original meta data gestational ages. 
+
+```{r}
+#set to files directory
+setwd("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/rawdata")
+GA <- readxl::read_xlsx("HRIF_Study_GA.xlsx") %>% 
+  dplyr::rename(Research_ID = "Research ID",
+                Gestational_Age2 = "Gestational Age",
+                GA_Days = "GEST_AGE_AT_BIRTH")
+
+# Subset cols of interest
+GA_1 <- GA[ , c("Research_ID", "Gestational_Age2", "GA_Days")]
+```
+
+### Merge Gestational Data to Main Meta 
+
+```{r warning=FALSE}
+# Merge new gestational ages to Table 1: 1663
+T1_GA <- merge(Table_1, GA_1, 
+            by = "Research_ID",
+            all = TRUE)
+length(unique(T1_GA$Research_ID)) # 1563
+
+# Extra people from new GA dataset
+setdiff(T1_GA$Research_ID, Table_1$Research_ID) # "R14815068", "R59519385"
+
+# just reorddering columns 
+T1_GA <- T1_GA %>%
+  dplyr::select(Research_ID, 
+                Gestational_Age1, 
+                Gestational_Age2,
+                GA_Days,
+                everything())
+
+# Convert GA_days to weeks
+T1_GA$GA_Days
+T1_GA <- T1_GA %>% 
+  mutate(GA_weeks = ifelse(!is.na(GA_Days) & GA_Days != 0, 
+                           round(GA_Days / 7, 1), NA))
+
+T1_GA$GA_weeks
+
+# Create a new column "GA_combined" by merging "Gestational_Age2" into "Gestational_Age1"
+T1_GA$GA_combined <- ifelse(is.na(T1_GA$Gestational_Age1), 
+                         T1_GA$Gestational_Age2, 
+                         T1_GA$Gestational_Age1)
+
+T1_GA$GA_combined2 <- ifelse(is.na(T1_GA$GA_combined), 
+                         T1_GA$GA_weeks, 
+                         T1_GA$GA_combined)
+
+# just reorddering columns 
+T1_GA_GA<- T1_GA %>%
+  dplyr::select(Research_ID, 
+                Gestational_Age1, 
+                Gestational_Age2,
+                GA_weeks,
+                GA_combined,
+                GA_combined2) %>% 
+        distinct()
+
+summary(T1_GA_GA[c("Gestational_Age1", 
+                "Gestational_Age2",
+                "GA_weeks",
+                "GA_combined",
+                "GA_combined2")])
+
+# Drop the original GAs we no longer need
+Table_1 <- Table_1 %>% 
+           dplyr::select(-c("Gestational_Age1"))
+
+# Merge in new combined GAs ad meta data 
+Table_1 <- merge(Table_1, T1_GA_GA, 
+                 by = "Research_ID",
+                 all = TRUE) 
+
+# Remove the 2 new IDs that have no meta data
+Table_1 <- Table_1[!(Table_1$Research_ID %in% 
+                       c("R14815068", "R59519385")), ]
+
+# How many children are missing GA scores? 89
+sum(is.na(Table_1$GA_combined2)) #89
+sum(!is.na(Table_1$GA_combined2)) #1472
+length(unique(Table_1$Research_ID)) #1561
+
+# How many children have GA scores, which are less than 20? 4
+low_GAs <- subset(Table_1, GA_combined2 <= 20)
+
+# Mention this in the manuscript
+Table_1_above20 <- Table_1[Table_1$GA_combined2 >= 20 | is.na(Table_1$GA_combined2), ]
+length(unique(Table_1$Research_ID)) # missing GA and 4 invalid 
+```
+
+# Participant Location
+
+```{r warning=FALSE}
+#set to files directory
+setwd("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/rawdata")
+# Table 2 Unique Patient Zipcodes ####
+Table_2 <- read.csv("Table2_UniqueHRIFVisit_0615.csv",               
+                    na = c("NA", "don't know", "","    .",
+                           "Missing: Not provided",999.00)) %>%
+  dplyr::rename(Research_ID = "Research.ID",
+                Encounter_ID = "Encounter.ID",
+                DOB = "Date.of.Birth",
+                Insurance = "Insurance.Type",
+                Encounter_Age_Months = "Age.at.Encounter.in.Months",
+                Encounter_Date = "Encounter.Date") %>% 
+  mutate(Encounter_ID = as.character(Encounter_ID)) %>% 
+  mutate(Encounter_Date = as.Date(Encounter_Date, format = "%m/%d/%Y"))
+
+# Variable selection
+Table_2 <- Table_2[ , c("Research_ID","Zipcode","Encounter_ID",
+                        "Encounter_Age_Months","Encounter_Date")]
+
+# Drop duplicate rows
+Table_2 <- Table_2[!duplicated(Table_2), ]
+
+# Drop rows with NA for all columns
+Table_2 <- Table_2[rowSums(is.na(Table_2)) != ncol(Table_2), ]
+
+# Create a column indicating ordinal rank of zipcode
+Table_2 <- Table_2 %>%
+  group_by(Research_ID) %>%
+  mutate(ZipcodeRank = rank(Encounter_Date))
+```
+
+# First Encounters
+
+```{r warning=FALSE}
+#set to files directory
+setwd("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/rawdata")
+Table_3 <- read_csv("Table3_DiagnosesFirstHRIF_0615.csv",               
+                    na = c("NA", "don't know", "","    .",
+                           "Missing: Not provided",999.00)) %>%
+          dplyr::rename(Research_ID = `Research ID`,
+                        Encounter_ID = `Encounter ID`,
+                        Dx_Code = `Dx Code`,
+                        Dx_Display = `Dx Display`)%>% 
+          mutate(Encounter_ID = as.character(Encounter_ID))
+```
+
+# All encounters 
+
+```{r warning=FALSE}
+#Table 4 Last Visits ####
+#set to files directory
+setwd("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/rawdata")
+Table_4 <- read_csv("Table4_DiagnosesLastHRIF_0615.csv",                 
+                    na = c("NA", "don't know", "", " .", 
+                           "Missing: Not provided",999.00)) %>%
+  dplyr::rename(Encounter_Age = `Age at Encounter in Months.`,
+                Research_ID = `Research ID`,
+                Encounter_ID = `Encounter ID`,
+                Encounter_Date = `Encounter Date`,
+                DOB = `Date of Birth`,
+                Dx_Code = `Dx Code`,
+                Dx_Display = `Dx Display`) %>% 
+  mutate(Encounter_ID = as.character(Encounter_ID))
+```
+
+# Bayleys Scores of Cognitive Developement
+
+```{r warning=FALSE}
+#set to files directory
+setwd("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/rawdata")
+Table_5 <- read_csv("Table5_BayleyScores_0615.csv",                 
+                    na = c("NA", "don't know", "", " .", 
+                           "Missing: Not provided",999.00)) %>%
+  dplyr::rename(Research_ID = `Research ID`,        
+                Gestational_Age = `Gestational Age.`,
+                Baseline_Age = `Age at Bayley Administration in Months`,
+                Birth_Date = `Date of Birth`,
+                Bayley_Date = `Bayley Administration Date`,
+                Motor_Composite_Score = `Motor Composite Score`,
+                Lang_Composite_Score = `Language Composite Score`,
+                Cognitive_Composite_Score = `Cognitive Composite Score`,
+                Encounter_ID = `Encounter ID`) %>%
+  mutate(Encounter_ID = as.character(Encounter_ID),
+         FIN = as.character(FIN),
+         Motor_Composite_Score = as.numeric(Motor_Composite_Score),
+         Lang_Composite_Score = as.numeric(Lang_Composite_Score),
+         Cognitive_Composite_Score = as.numeric(Cognitive_Composite_Score))
+# Ignore warnings for irrelevant variables
+
+# Select the variables of interest
+Table_5 <- subset(Table_5, select = c("Research_ID",
+                                      "Baseline_Age","Birth_Date","Encounter_ID",
+                                      "Bayley_Date","Motor_Composite_Score", 
+                                      "Lang_Composite_Score",
+                                      "Cognitive_Composite_Score"))
+length(unique(Table_5$Research_ID)) # 792
+
+#format dates 
+Table_5$Birth_Date = mdy(Table_5$Birth_Date)
+Table_5$Bayley_Date = mdy(Table_5$Bayley_Date)
+
+# compute the Bayley's age in Days
+Table_5$Bayleys_Age_Days = as.numeric(Table_5$Bayley_Date - Table_5$Birth_Date)
+
+# compute the Bayley's Age in Months 
+Table_5$Bayleys_Age_Months <- interval(Table_5$Birth_Date, 
+                                       Table_5$Bayley_Date) %/% months(1)
+
+#removing participants older than 42 months at Bayleys test: 
+sum(Table_5$Bayleys_Age_Months >= 42, na.rm = T) # Removed 11 over the age limit
+Table_5 <- Table_5[Table_5$Bayleys_Age_Months <= 42,]
+length(unique(Table_5$Research_ID)) # 792 (stays the same because of multiple visits for same IDs)
+
+#	How many NAs per Bayley's Test
+sum(is.na(Table_5$Motor_Composite_Score)) #348
+sum(is.na(Table_5$Lang_Composite_Score)) #369
+sum(is.na(Table_5$Cognitive_Composite_Score)) #567
+
+# Convert Bayleys to integer 
+Table_5$Motor_Composite_Score <- as.integer(Table_5$Motor_Composite_Score)
+Table_5$Lang_Composite_Score <- as.integer(Table_5$Lang_Composite_Score)
+Table_5$Cognitive_Composite_Score <- as.integer(Table_5$Cognitive_Composite_Score)
+
+sum(is.na(Table_5$Motor_Composite_Score)) #348
+sum(is.na(Table_5$Lang_Composite_Score)) #369
+sum(is.na(Table_5$Cognitive_Composite_Score)) #567
+
+# Subset any absurdly high scores
+over_150 <- subset(Table_5, Lang_Composite_Score > 150 | 
+                     Motor_Composite_Score > 150 | 
+                     Cognitive_Composite_Score > 150)
+nrow(over_150) #2
+
+# remove kids with scores out of range 
+Table_5 <- subset(Table_5, Lang_Composite_Score <= 150 | 
+                    is.na(Table_5$Lang_Composite_Score)) 
+
+Table_5 <- subset(Table_5, Motor_Composite_Score <= 150 | 
+                       is.na(Table_5$Motor_Composite_Score))
+
+Table_5 <- subset(Table_5, Cognitive_Composite_Score <= 150 | 
+                    is.na(Table_5$Cognitive_Composite_Score))
+
+length(unique(Table_5$Research_ID)) # 791
+
+# Add column indicating date rank (only 1 missing rank)
+Table_5 <- Table_5 %>%
+  group_by(Research_ID) %>%
+  mutate(DateRank = rank(Bayley_Date))
+
+# "R77029329" this person has 2 dates and 5 rows. ranks ar 2 and 4.5 
+random_dude <- subset(Table_5, 
+                      Research_ID == "R77029329" & Lang_Composite_Score == 77)
+
+# Subset first bayley's visit only
+Table_5 <- subset(Table_5, DateRank == 1|
+                    DateRank == 1.5) 
+
+# merge rando back into dataset
+Table_5 <- rbind(Table_5, random_dude)
+
+# Remove date rank column (unnecessary)
+Table_5 <- Table_5[, !names(Table_5) %in% c("DateRank")]
+```
+
+# Child Opportunity Scores
+
+```{r warning=FALSE}
+#set to files directory
+setwd("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/rawdata")
+Table_COI <- read.csv("Zip_Code_COI.csv",
+                      na = c("NA", "don't know", "", "    .", 
+                             "Missing: Not provided", 999.00)) %>%
+            dplyr::rename(Zipcode = "ZIP.Code",
+                          RC_Assigned = "RC.assingments",
+                          RC1 = "Regional.Center.1",
+                          RC2 = "Regional.Center.2",
+                          RC3 = "Regional.Center.3",
+                          asian = "aian") %>% 
+  mutate(Zipcode = as.character(Zipcode))
+
+# Variable selection
+Table_COI <- Table_COI[ , c("Zipcode","r_coi_nat","c5_coi_nat")]
+```
+
+### Join COI and meta data 
+
+```{r}
+Table_all <- Table_1_above20 %>% 
+  left_join(Table_2, by = "Research_ID") %>% 
+  left_join(Table_COI, by = "Zipcode")
+
+#length(unique(Table_all$Research_ID))
+#sum(is.na(Table_all$r_coi_nat)) 
+#sum(!is.na(Table_all$r_coi_nat)) 
+```
+
+# Load PMCA classifications
+Classifications were determined using script 1
+
+```{r}
+pmca_first <- read_csv("/Users/emily/projects/research/ADOR/CHLA_clean/outputs/dataframes/pmca_first_12.05.csv", 
+                       na = c("NA", "don't know", "", " .", 
+                              "Missing: Not provided",999.00)) %>% 
+                       dplyr::rename(pmca_first = "PMCA_category")
+
+length(unique(pmca_first$Research_ID)) # 1549
+```
+
+### Merge PMCA data and meta
+
+```{r}
+Table_all2 <- Table_all %>% left_join(pmca_first)
+sum(unique(Table_5$Research_ID) %in% pmca_first$Research_ID)
+```
+
+### Merge PMCA, COI, Bayleys and Meta
+
+```{r}
+T1_noEnc <- Table_all2 %>% dplyr::select(-c(Encounter_ID, Encounter_Date, ZipcodeRank))
+T5_noEnc <- Table_5 %>% dplyr::select(-c(Encounter_ID))
+
+T1_5 <- merge(T1_noEnc, T5_noEnc, 
+              by = "Research_ID",
+              all = TRUE) %>% 
+              unique()
+```
+
+#### A few checks
+
+```{r}
+sum(is.na(T1_5$r_coi_nat)) # 389
+sum(!is.na(T1_5$r_coi_nat)) # 1423
+length(unique(T1_5$Research_ID)) # 1558
+
+# How many not missing GA
+subset_GA <- T1_5[!is.na(T1_5$GA_combined2), ]
+length(unique(subset_GA$Research_ID)) # 1468
+
+# Identifying how many infants have at least 1 Bayleys score
+subset_bay <- Table_5[(!is.na(Table_5$Motor_Composite_Score) | 
+                         !is.na  (Table_5$Lang_Composite_Score)  | 
+                         !is.na(Table_5$Cognitive_Composite_Score)), ]
+
+# Identifying how many infants have all 3 Bayleys scores
+subset_bay_and <- Table_5[(!is.na(Table_5$Motor_Composite_Score) & 
+                             !is.na(Table_5$Lang_Composite_Score)  & 
+                             !is.na(Table_5$Cognitive_Composite_Score)), ]
+
+```
+
+### More edits to bayleys and meta 
+
+```{r}
+# Joining and editing a master table ####
+table_df <- Table_all2
+length(unique(table_df$Research_ID)) # 1557
+bayleys <- Table_5
+
+# Create a column indicating rank of bayleys ages 
+bayleys <- bayleys%>%
+  dplyr::group_by(Research_ID) %>%
+  mutate(bayleys_age_rank = rank(Bayleys_Age_Days)) 
+
+# Merge bayley's data and meta data
+# This gets used later to assess ages at bayleys and encounters.
+meta_for_testing <- table_df %>% 
+  dplyr::select(Research_ID, Sex, Race, Ethnicity, V3_RACE, Language,  
+                Gestational_Age1, Gestational_Age2, GA_combined,
+                GA_combined2, r_coi_nat, pmca_first, Encounter_Age_Months,
+                first_bayleys_age, Encounter_Date, Zipcode, DateOfFirstHRIFVisit) %>% 
+  unique() %>% 
+  filter(Research_ID %in% bayleys$Research_ID)
+
+meta_for_bayleys <- table_df %>% 
+  dplyr::select(Research_ID, Sex, Race, Ethnicity, V3_RACE, Language,  
+                Gestational_Age1, Gestational_Age2, GA_combined,
+                GA_combined2, r_coi_nat, pmca_first) %>% 
+  unique() %>% 
+  filter(Research_ID %in% bayleys$Research_ID)
+
+meta_bayleys <- merge(meta_for_bayleys, bayleys, 
+                      by.x = "Research_ID", 
+                      by.y = "Research_ID")
+
+```
+
+### Making categories 
+out of continuous variables 
+
+```{r}
+## reorder pmca cats for plotting later
+meta_bayleys$pmca_first <- factor(meta_bayleys$pmca_first, 
+                                  levels = c("Non-chronic", 
+                                             "Non-complex Chronic", 
+                                             "Complex Chronic"))
+
+# Breaking up COI
+quantile(meta_bayleys$r_coi_nat, c(0:3/3), na.rm=TRUE)
+meta_bayleys$coi_cat <- ifelse(meta_bayleys$r_coi_nat <= 16,"low",
+                               ifelse(meta_bayleys$r_coi_nat > 16 & meta_bayleys$r_coi_nat <= 41.4, "medium",
+                                      ifelse(meta_bayleys$r_coi_nat > 41.4, "high", NA)))
+
+### Gestational Age Categories ####
+meta_bayleys$Gestational_Class = ifelse(test = meta_bayleys$GA_combined2 < 28,
+                                        yes = "Extremely_Preterm",
+                                        no = ifelse(test = meta_bayleys$GA_combined2 < 32,
+                                                    yes = "Very_Preterm",
+                                                    no = ifelse(test = meta_bayleys$GA_combined2 < 34,
+                                                                yes = "Moderate_Preterm",
+                                                                no = ifelse(test = meta_bayleys$GA_combined2 <= 37,
+                                                                            yes = "Late_Preterm",
+                                                                            no = "Term"))))    
+## reorder cats for plotting later
+meta_bayleys$Gestational_Class <- factor(meta_bayleys$Gestational_Class, 
+                                         levels = c("Extremely_Preterm", 
+                                                    "Very_Preterm",
+                                                    "Moderate_Preterm",
+                                                    "Late_Preterm",
+                                                    "Term"))
+
+# Create a numeric variable for PMCA ranked 
+meta_bayleys$PMCA_rank <- ifelse(meta_bayleys$pmca_first=="Non-chronic",0,
+                                 ifelse(meta_bayleys$pmca_first=="Non-complex Chronic",1,
+                                        ifelse(meta_bayleys$pmca_first=="Complex Chronic",2, NA)))
+
+```
+
+# Subset to only first Bayleys Assessments 
+
+```{r}
+## Update meta_bayleys with ranks
+meta_1_date_bayleys <- meta_bayleys %>%
+  group_by(Research_ID) %>%
+  mutate(
+    bayleys_age_rank = rank(Bayleys_Age_Days, ties.method = "max"),
+    DateRank = rank(Bayley_Date)
+  ) %>%
+  ungroup() 
+
+## Define rank values and dataframe names for age ---
+age_ranks <- 1:3
+age_df_names <- paste("meta", age_ranks, "age_bayleys", sep = "_")
+
+# Create age dataframes
+lapply(seq_along(age_ranks), function(i) {
+  assign(x = age_df_names[i], 
+         value = filter(meta_1_date_bayleys, bayleys_age_rank == age_ranks[i]), 
+         envir = .GlobalEnv)
+})
+
+## Define rank values and dataframe names for date ----
+date_ranks <- 1:3
+date_df_names <- paste("meta", date_ranks, "date_bayleys", sep = "_")
+
+# Create date dataframes
+lapply(seq_along(date_ranks), function(i) {
+  assign(x = date_df_names[i], 
+         value = filter(meta_1_date_bayleys, DateRank == date_ranks[i]), 
+         envir = .GlobalEnv)
+})
+```
+
+# Determine age at Bayleys
+
+```{r}
+# subset only the cols we want 
+bayley_age <- meta_for_testing %>% 
+  dplyr::select("Research_ID","first_bayleys_age") %>% 
+  unique()
+
+# This makes sure we only using the first bayleys assessment. 
+meta1bay_age <- merge(meta_1_date_bayleys, bayley_age, by = "Research_ID",
+                      all.x = TRUE, all.y = FALSE) %>% 
+  dplyr::select(c("Research_ID","first_bayleys_age"))
+```
+
+# Determine age at first encounter
+
+```{r}
+T2 <- Table_2 %>% 
+  dplyr::select(c("Research_ID", "Encounter_ID", 
+                  "Encounter_Age_Months")) %>% unique()
+T3 <- Table_3 %>% 
+  dplyr::select(c("Research_ID", "Encounter_ID")) %>% unique()
+
+T2_3 <- merge(T2, T3, 
+              by = c("Encounter_ID", "Research_ID"), all.y = TRUE)
+
+# merge bayles and encounter ages 
+T_age <- merge(T2_3, meta1bay_age, by = c("Research_ID"), 
+               all.x = TRUE, all.y = FALSE)
+```
+
+# Write main analysis files 
+
+```{r warning=FALSE}
+# Write tis data file with everything in it 
+#setwd("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/clean_inputs/july5/")
+#save(meta_bayleys,
+#     meta_1_date_bayleys,
+#     meta_for_testing,
+#     T_age,
+#     file='meta_bay_checks_july5.RData')
+```
+
+
+
+
+
+
+
+
+
+

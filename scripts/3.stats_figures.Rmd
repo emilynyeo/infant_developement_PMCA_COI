@@ -1,0 +1,1165 @@
+---
+title: "3.stats_figures"
+author: "Emily Yeo"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#clear environment
+rm(list = ls())
+# Load packages
+pacman::p_load(knitr, tidyverse, magrittr, lme4, lmerTest, GGally, corrplot, 
+               Hmisc, kableExtra, dplyr, plyr, janitor, lubridate, survminer, 
+               ggplot2, here, readr, tableone, officer, flextable,finalfit,
+               purrr, stringr, lme4, corrplot, pscl, stargazer, MASS, lmerTest,
+               pccc, icd, RCurl, reshape2, summarytools, visdat, data.table,
+               dplyr,tidyr,tableone,kableExtra,sjPlot, sjstats, gridExtra, 
+               ggridges, car, cowplot, dunn.test, broom)
+
+#smb://ucbfiles.colorado.edu
+load("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/clean_inputs/aapril11/meta_bay_april11.RData")
+#load("~/projects/research/ADOR/CHLA_clean//clean_inputs/meta_bay_april11.RData")
+#ages <- fread("/Users/emily/projects/research/ADOR/CHLAneuro/Output/enc_bayley_ages_first_0618.csv")
+ages <- fread("/Users/emily/projects/research/ADOR/CHLAneuro/Output/enc_bayley_ages_first_0705.csv")
+```
+
+```{r make no NA data frames}
+# Merge encounter and baleys ages 
+m <- merge(ages, meta_1_date_bayleys, by = "Research_ID")
+# This is used for main paper figures, table 2, supp tables 2-4
+meta_mod2 <- meta_1_date_bayleys %>% 
+  dplyr::select(c(Research_ID, Sex, GA_combined2, r_coi_nat, PMCA_birth, 
+           Motor_Composite_Score, Lang_Composite_Score, coi_cat,
+           Cognitive_Composite_Score)) %>% na.omit()
+
+# For Supp Table 4 
+meta_modS4 <- meta_1_date_bayleys %>% 
+  dplyr::select(c(Research_ID, Sex, GA_combined2, r_coi_nat, PMCA_birth, 
+           Motor_Composite_Score, Lang_Composite_Score, coi_cat,
+           Cognitive_Composite_Score, Bayleys_Age_Months)) %>% na.omit()
+
+# For main paper 1 
+t1_descriptives <- m %>% 
+  dplyr::select(c(Research_ID, Sex, GA_combined2, r_coi_nat, PMCA_birth, 
+           Motor_Composite_Score, Lang_Composite_Score, coi_cat,
+           Cognitive_Composite_Score, V3_RACE, Bayleys_Age_Months, age_at_enc_months)) %>% na.omit()
+
+# For supplementary table 5 & 6
+meta_mod5_6 <- meta_1_date_bayleys %>% 
+  dplyr::select(c(Research_ID, Sex, GA_combined2, r_coi_nat, PMCA_birth, 
+           Motor_Composite_Score, Lang_Composite_Score, coi_cat,
+           Cognitive_Composite_Score, V3_RACE)) %>% 
+  na.omit() %>% 
+  mutate(coi_cat = as.factor(coi_cat),
+         Sex = as.factor(Sex),
+         V3_RACE = as.factor(V3_RACE))
+  
+```
+
+```{r LongDF for plotting later}
+long_df <- pivot_longer(meta_mod2,
+                        cols = c(Lang_Composite_Score, 
+                                 Cognitive_Composite_Score, 
+                                 Motor_Composite_Score),
+                        names_to = "Which_Bayleys",
+                        values_to = "Composite_Score")
+long_df <- long_df %>%
+  mutate(Which_Bayleys = case_when(
+         Which_Bayleys == "Cognitive_Composite_Score" ~ "Cognitive Domain",
+         Which_Bayleys == "Lang_Composite_Score" ~ "Language Domain",
+         Which_Bayleys == "Motor_Composite_Score" ~ "Motor Domain",
+         TRUE ~ Which_Bayleys))
+```
+
+# Descriptive stats
+Section involves Table 1 & stats to compare variables across PMCA & race/ethnicity categories. 
+
+## Table 1 - done
+Baseline characteristics across PMCA groups
+
+```{r}
+# which vars to include 
+descrip_vars <- c("Sex","GA_combined2","V3_RACE","coi_cat",
+                  "Cognitive_Composite_Score",
+                  "Motor_Composite_Score",
+                  "Lang_Composite_Score",
+                  "PMCA_birth",
+                  "Bayleys_Age_Months",
+                  "age_at_enc_months")
+desc_labels <- c("Sex","Gestational Age","Race and/or Ethnicity","Child Opp Index",
+                 "Cognitive Bayleys Score",
+                 "Motor Bayleys Score",
+                 "Language Bayleys Score",
+                 "PMCA Category",
+                 "Age at first Bayleys",
+                 "Age at first encounter")
+des_cat_vars <- c("Sex","V3_RACE","coi_cat","PMCA_birth")
+
+descrip_table <- dplyr::select(t1_descriptives, one_of(descrip_vars))
+
+labelled::var_label(descrip_table) <- desc_labels
+descriptive_T1 <- CreateTableOne(vars = descrip_vars, 
+                                   data = descrip_table, 
+                                   factorVars = des_cat_vars, 
+                                   strata = "PMCA_birth",
+                                   includeNA=T,
+                                   addOverall = T,
+                                   test = TRUE,
+                                   testApprox = chisq.test,
+                                   testNormal = oneway.test,
+                                   argsNormal = list(var.equal = TRUE),
+                                   testNonNormal = kruskal.test)
+#kable(summary(descriptive_T1))
+d_T1 <- print(descriptive_T1,
+               catDigits = 1, 
+               contDigits = 1, 
+               varLabels = T,
+               exact = "stage", 
+               quote = FALSE, 
+               noSpaces = TRUE, printToggle = FALSE)
+## Save to a CSV file
+#write.csv(d_T1, 
+#          file = "/Users/emily/projects/research/ADOR/CHLA_clean/outputs/tables/Table1_April12.csv")
+## Save to html
+d_T1 <- d_T1 %>% 
+     kable(caption = "Baseline Characteristics") %>%
+     kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+#write.csv(d_T1, 
+#          file = "/Users/emily/projects/research/ADOR/CHLA_clean/outputs/tables/Table1_April12.html")
+d_T1
+```
+
+#### Between PMCA group stats - done 
+Continuous variables 
+
+```{r}
+# Testing normality (ANOVA assumption) ... all non-normal - kruskal wallis 
+shapiro.test(meta_mod2$GA_combined2) #p-value < 2.2e-16
+shapiro.test(meta_mod2$Motor_Composite_Score) #p-value = 3.57e-10
+shapiro.test(meta_mod2$Lang_Composite_Score) #p-value = 1.927e-11
+shapiro.test(meta_mod2$Cognitive_Composite_Score) #p-value = 7.782e-14
+shapiro.test(meta_mod2$r_coi_nat) #p-value < 2.2e-16
+# Testing Homogeneity of variance (ANOVA assumption)
+leveneTest(GA_combined2 ~ PMCA_birth, data = meta_mod2) #p-value = 0.03994
+leveneTest(Motor_Composite_Score ~ PMCA_birth, data = meta_mod2) #p-value = 
+leveneTest(Lang_Composite_Score ~ PMCA_birth, data = meta_mod2) #p-value = 
+leveneTest(Cognitive_Composite_Score ~ PMCA_birth, data = meta_mod2)
+leveneTest(r_coi_nat ~ PMCA_birth, data = meta_mod2) # p = 0.1644
+leveneTest(r_coi_nat ~ V3_RACE, data = meta_1_date_bayleys) # 0.000264
+# Kruskal W
+kruskal.test(GA_combined2 ~ PMCA_birth, data = meta_mod2)
+kruskal.test(Motor_Composite_Score ~ PMCA_birth, data = meta_mod2)
+kruskal.test(Lang_Composite_Score ~ PMCA_birth, data = meta_mod2)
+kruskal.test(Cognitive_Composite_Score ~ PMCA_birth, data = meta_mod2)
+kruskal.test(r_coi_nat ~ V3_RACE, data = meta_1_date_bayleys) # Yes. 
+# Post hoc Dunn's test with Bonferroni correction
+dunn.test(x = meta_1_date_bayleys$r_coi_nat, 
+          g = meta_1_date_bayleys$V3_RACE, method = "bonferroni")
+
+dunn.test(x = meta_mod5_6$r_coi_nat,
+          g = meta_mod5_6$V3_RACE, method = "bonferroni")
+
+dunn.test(x = meta_mod2$GA_combined2, 
+          g = meta_mod2$PMCA_birth, method = "bonferroni")
+
+capture.output(dun_GA <-
+  as.data.frame(dunn.test(
+    x = meta_mod2$GA_combined2,
+    g = meta_mod2$PMCA_birth,
+    table = FALSE,
+    kw = FALSE,
+    label = FALSE,
+    alpha = 0.05)), file = "NULL")
+
+dun_GA
+cor.test(meta_mod2$Motor_Composite_Score, meta_mod2$GA_combined2)
+cor.test(meta_mod2$Cognitive_Composite_Score, meta_mod2$GA_combined2)
+cor.test(meta_mod2$Lang_Composite_Score, meta_mod2$GA_combined2)
+```
+
+#### Categorical Variables 
+```{r}
+chisq.test(table(meta_mod2$Sex, meta_mod2$PMCA_birth))
+chisq.test(table(meta_mod2$coi_cat, meta_mod2$PMCA_birth))
+chisq.test(meta_mod5_6$V3_RACE, meta_mod5_6$PMCA_birth)
+```
+
+#### Between race/ethnicity group stats
+```{r}
+chisq.test(table(meta_mod5_6$coi_cat, meta_mod5_6$V3_RACE))
+```
+
+# Main paper regression tables & Figures 
+
+First, setting the reference levels for the models to follow:
+
+```{r Setting factor refs}
+# PMCA usual is non-chronic complex
+meta_mod2$PMCA_birth <- as.factor(meta_mod2$PMCA_birth)
+meta_mod2$PMCA_birth <- factor(meta_mod2$PMCA_birth, 
+                                      levels = c("Non-chronic",
+                                                 "Non-complex Chronic",
+                                                 "Complex Chronic"))
+meta_mod2 <- within(meta_mod2, 
+                         PMCA_birth <- relevel(PMCA_birth,ref="Non-chronic"))
+
+# Also making a PMCA CC as ref in case 
+meta_mod2$PMCA_birth_cc <- factor(meta_mod2$PMCA_birth, 
+                                      levels = c("Complex Chronic",
+                                                 "Non-complex Chronic",
+                                                 "Non-chronic"))
+meta_mod2 <- within(meta_mod2, 
+                         PMCA_birth_cc <- relevel(PMCA_birth_cc,
+                                                  ref="Complex Chronic"))
+
+# Race and Ethnicity 
+meta_mod5_6$V3_RACE <- as.factor(meta_mod5_6$V3_RACE)
+meta_mod5_6$V3_RACE <- factor(meta_mod5_6$V3_RACE, 
+                                      levels = c("White", "Hispanic or Latino", 
+                                                 "Black or African American", 
+                                                 "Asian or Pacific Islander", 
+                                                 "Middle Eastern or North African", 
+                                                 "Other Race", 
+                                                 "Nonconforming data"))
+meta_mod5_6 <- within(meta_mod5_6, 
+                         V3_RACE <- relevel(V3_RACE, ref="White"))
+
+# COI cat
+meta_mod2$coi_cat <- as.factor(meta_mod2$coi_cat)
+meta_mod2 <- within(meta_mod2, 
+                         coi_cat <- relevel(coi_cat, ref="high"))
+# Sex
+meta_mod2$Sex <- as.factor(meta_mod2$Sex)
+meta_mod2 <- within(meta_mod2, 
+                         Sex <- relevel(Sex, ref="Female"))
+```
+
+## Table 2 - done 
+Pediatric Medical Complexity and Child Opportunity were Associated with Neurodevelopmental Outcomes, when adjusting for COI, GA and Sex.
+
+```{r Table 2 main model, echo=FALSE}
+# Model for the cog score
+cog_model <- lm(Cognitive_Composite_Score ~ PMCA_birth + r_coi_nat + GA_combined2 + Sex, 
+                      data=meta_mod2)
+# Model for the motor score
+motor_model <- lm(Motor_Composite_Score ~ PMCA_birth + r_coi_nat + GA_combined2 + Sex, 
+                       data=meta_mod2)
+# Model for the language score
+language_model <- lm(Lang_Composite_Score ~ PMCA_birth + r_coi_nat + GA_combined2 + Sex, 
+                          data=meta_mod2)
+
+sjPlot::tab_model(cog_model,motor_model,language_model,
+                  title = "Developemental scores across PMCA, COI, Gestational Age and Sex",
+                  string.pred = "Predictors",
+                  string.est = "Estimate",
+                  string.std = "std. Beta",
+                  string.ci = "95% CI",
+                  string.se = "std. Error",
+                  p.style = c("numeric"), 
+                  p.threshold = c(0.05),
+                  dv.labels = c("Cognitive Score", "Motor Score", "Language Score"),
+                  auto.label = FALSE,
+                  pred.labels = c("Intercept (PMCA Non-chronic)", 
+                                  "PMCA Non-complex Chronic",                                  
+                                  "PMCA Complex Chronic", 
+                                  "Child Opp. Index",
+                                  "Sex, Male",
+                                  "Gestational Age"))
+```
+
+## Figure 1 
+Missing data to get to the final cohort 
+
+## Figure 2A - done
+Development across each domain, differed by infant pediatric medical complexity. Post hoc between group comparisons. 
+
+```{r PMCA and raw bayleys, echo=FALSE}
+theme_set(theme_ridges())
+
+no_pmca_na <- long_df %>% 
+  filter(!is.na(PMCA_birth))
+
+ggplot(no_pmca_na, aes(x = PMCA_birth, y = Composite_Score, fill = Which_Bayleys)) +
+  geom_boxplot(alpha = 0.6, position = position_dodge(width = 0.9)) +
+  #stat_kwAllPairsDunnTest() +
+  #stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.2, position = position_dodge(width = 0.9)) +
+  #stat_summary(fun.y = mean, geom = "point", color = "black", size = 3, position = position_dodge(width = 0.9)) +
+  scale_fill_manual(values = c("#809bce", "#B2D3C2", "#7ec4cf", "#a6cee3", 
+                               "#1f78b4", "#b2df8a", "#39a46c"), 
+                    name = "Bayleys Developmental Domain") +
+  labs(x = "PMCA categorization", y = "Bayleys Composite Score") +
+  scale_y_continuous(sec.axis = dup_axis(label = NULL,
+                                         name = NULL),
+                     expand = expand_scale(mult = c(0, 0)),
+                     breaks = pretty(c(40,130), n = 10),
+                     limits = c(40,130)) +
+  theme(axis.title.x = element_text(margin = margin(t = 20), 
+                                    hjust = 0.5,
+                                    size = 13),  
+        axis.title.y = element_text(margin = margin(r = 20), 
+                                    hjust = 0.5,
+                                    size = 12),
+        axis.text.x = element_text(size = 10),  
+        axis.text.y = element_text(size = 10),
+    #panel.grid.major = element_line(color = "black", size = 0.5),  
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),  # Remove minor grid lines
+    axis.line.x = element_line(color = "black"), 
+    axis.line.y = element_line(color = "black"), 
+    axis.line.y.right = element_blank(),
+        legend.title = element_text(size = 12),
+        plot.margin = margin(1, 0, 1, 0.5, "cm"),
+        legend.position = "right")
+```
+
+## Figure 2B - done
+Development across each domain, differed by infant pediatric medical complexity. Non-normal distributions.
+
+```{r PMCA bayleys distribuitions, echo=FALSE}
+theme_set(theme_ridges())
+
+no_pmca_na <- long_df %>% 
+  filter(!is.na(PMCA_birth))
+
+mean_scores <- no_pmca_na %>%
+  dplyr::group_by(Which_Bayleys) %>%
+  dplyr::summarize(mean_score = mean(Composite_Score, na.rm = TRUE))
+
+meansd <- function(x, ...) {
+  mean <- mean(x)
+  c(mean)}
+
+ggplot(no_pmca_na, aes(x = Composite_Score, y = Which_Bayleys)) +
+  geom_density_ridges2(aes(fill = PMCA_birth),
+                       quantile_lines = T, 
+                       quantile_fun = meansd,
+                       alpha = 0.6, 
+                       scale = 0.9) +
+  scale_fill_manual(values = c("#809bce", "#B2D3C2", "#7ec4cf", "#a6cee3", 
+                               "#1f78b4", "#b2df8a", "#39a46c"), 
+                    name = "PMCA Category") +
+  stat_summary(fun = mean, geom = "point", 
+               aes(shape = PMCA_birth),
+               size = 1.8, color = "black", 
+               position = position_nudge(y = 0.2),
+               show.legend = FALSE) +
+  scale_linetype_manual(values = c("solid", "dashed", "dotted")) +
+  labs(x = "Bayleys Composite Score", y = "Bayleys Developemental Domain") +
+  theme(axis.title.x = element_text(margin = margin(t = 20), 
+                                    hjust = 0.5,
+                                    size = 13),  
+        axis.title.y = element_text(margin = margin(r = 20), 
+                                    hjust = 0.5,
+                                    size = 12),
+        legend.title = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),  # Remove minor grid line
+        axis.line.x = element_line(color = "black"), 
+        axis.line.y = element_line(color = "black"), 
+        axis.line.y.right = element_blank(),
+        plot.margin = margin(1, 0, 1, 0.5, "cm"),
+        legend.position = "right")
+```
+
+## Figure 3A - done
+Greater Medical Complexity were Predicted to have Lower Bayley’s Developmental Scores.  
+
+```{r Fig3A predicted PMCA bayleys, echo=FALSE}
+### Estimated Marginal Means
+library(emmeans)
+# Cognitive Estimated Marginal Means 
+cog_emmeans <- summary(emmeans(cog_model, ~ PMCA_birth))
+# Motor Estimated Marginal Means 
+motor_emmeans <- summary(emmeans(motor_model, ~ PMCA_birth)) 
+# Language Estimated Marginal Means 
+lang_emmeans <- summary(emmeans(language_model, ~ PMCA_birth))
+# Display parameters
+ci_barwidth <- .35 # CI bar size
+cog_emmeans$PMCA_birth <- factor(cog_emmeans$PMCA_birth, 
+                                  levels = c("Non-chronic", "Non-complex Chronic", "Complex Chronic")) # Order
+motor_emmeans$PMCA_birth <- factor(motor_emmeans$PMCA_birth, 
+                                  levels = c("Non-chronic", "Non-complex Chronic", "Complex Chronic")) # Order 
+lang_emmeans$PMCA_birth <- factor(lang_emmeans$PMCA_birth, 
+                                  levels = c("Non-chronic", "Non-complex Chronic", "Complex Chronic")) # Order
+# Function to shorten x-axis labels
+shorten_labels <- function(x) {
+  ifelse(x == "Non-chronic", "NC", 
+         ifelse(x == "Non-complex Chronic", "NCC",
+                ifelse(x == "Complex Chronic", "CC", x)))}
+
+library(patchwork)
+ci_barwidth <- 0.2
+
+# Function to create individual plots
+create_plot <- function(data, y_label, title) {
+  plot <- data %>% 
+    ggplot(aes(x = PMCA_birth, y = emmean, fill = PMCA_birth)) +
+    geom_bar(stat = 'identity', color = 'black') +
+    geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = ci_barwidth) +
+    scale_fill_manual(values = c("#809bce", "#B2D3C2", "#7ec4cf", "#a6cee3", 
+                                 "#1f78b4", "#b2df8a", "#39a46c")) +
+    scale_x_discrete(labels = shorten_labels) + 
+    xlab("PMCA Category") +
+    ylab(y_label) +
+    ggtitle(title) +
+    theme_bw() + 
+    #ylim(50, 100) +
+    theme(
+      axis.title.x = element_text(margin = margin(t = 20), hjust = 0.5, size = 15),
+      axis.title.y = element_text(margin = margin(r = 20), hjust = 0.5, size = 15),
+      axis.text.x = element_text(size = 12),
+      axis.text.y = element_text(size = 12),
+      plot.title = element_text(size = 15),
+      plot.margin = margin(1, 0, 1, 0.5, "cm"),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.border = element_blank(),
+      axis.line.x = element_line(color = "black"), 
+      axis.line.y = element_line(color = "black"), 
+      axis.line.y.right = element_blank(),
+      legend.position = "none") +
+    coord_cartesian(ylim = c(40, 100)) 
+  
+  return(plot)
+}
+
+create_plot <- function(data, y_label, title) {
+  plot <- data %>% 
+    ggplot(aes(x = PMCA_birth, y = emmean, fill = PMCA_birth)) +
+    geom_bar(stat = 'identity', color = 'black') +
+    geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = ci_barwidth) +
+    scale_fill_manual(values = c("#809bce", "#B2D3C2", "#7ec4cf", "#a6cee3", 
+                                 "#1f78b4", "#b2df8a", "#39a46c")) +
+    scale_x_discrete(labels = shorten_labels) + 
+    xlab("PMCA Category") +
+    ylab(y_label) +
+    ggtitle(title) +
+    theme_bw() + 
+    theme(
+      axis.title.x = element_text(margin = margin(t = 20), hjust = 0.5, size = 17, face = "bold"),
+      axis.title.y = element_text(margin = margin(r = 20), hjust = 0.5, size = 17, face = "bold"),
+      axis.text.x = element_text(size = 14, face = "bold"),  # Adjust size and add bold
+      axis.text.y = element_text(size = 14, face = "bold"),  # Adjust size and add bold
+      plot.title = element_text(size = 17, face = "bold"),  # Adjust size and add bold
+      plot.margin = margin(1, 0, 1, 0.5, "cm"),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.border = element_blank(),
+      axis.line.x = element_line(color = "black"), 
+      axis.line.y = element_line(color = "black"), 
+      axis.line.y.right = element_blank(),
+      legend.position = "none"
+    ) +
+    coord_cartesian(ylim = c(40, 100))  # Limit y-axis to range from 40 to 100
+  
+  return(plot)
+}
+
+
+# Create individual plots
+cog_plot <- create_plot(cog_emmeans, "Cognitive Bayley's Score", "Cognitive Score by PMCA")
+motor_plot <- create_plot(motor_emmeans, "Motor Bayley's Score", "Motor Score by PMCA")
+lang_plot <- create_plot(lang_emmeans, "Language Bayley's Score", "Language Score by PMCA")
+
+# Combine plots using patchwork
+final_plot <- cog_plot + motor_plot + lang_plot + plot_layout(ncol = 3)
+
+# Display the combined plot
+final_plot
+```
+
+## Figure 3B - done
+Greater Medical Complexity were Predicted to have Lower Bayley’s Developmental Scores.  
+-> note to remove the "box"
+
+```{r Fig 3B log odds, echo=FALSE}
+#install.packages("finalfit")
+library(finalfit)
+library(nnet)
+# Function to determine if a value is in the lowest decile
+is_lowest_decile <- function(x) {
+  quantile(x, probs = 0.1) >= x }
+
+# make lowest decile col
+meta_mod2 <- meta_mod2 %>%
+  mutate(Motor_Lowest_Decile = factor(ifelse(is_lowest_decile(Motor_Composite_Score), 
+                                             "yes", "no"), 
+                                      levels = c("yes", "no")),
+         Lang_Lowest_Decile = factor(ifelse(is_lowest_decile(Lang_Composite_Score), 
+                                            "yes", "no"), 
+                                     levels = c("yes", "no")),
+         Cognitive_Lowest_Decile = factor(ifelse(is_lowest_decile(Cognitive_Composite_Score), 
+                                                 "yes", "no"), 
+                                          levels = c("yes", "no")))
+meta_mod2 <- meta_mod2 %>%
+  mutate(Motor_LowDec_NoYes = factor(ifelse(is_lowest_decile(Motor_Composite_Score), 
+                                             "yes", "no"), 
+                                     levels = c("no","yes")),
+         Lang_LowDec_NoYes = factor(ifelse(is_lowest_decile(Lang_Composite_Score), 
+                                            "yes", "no"), 
+                                    levels = c("no","yes")),
+         Cognitive_LowDec_NoYes = factor(ifelse(is_lowest_decile(Cognitive_Composite_Score), 
+                                                 "yes", "no"), 
+                                         levels = c("no","yes")))
+long_df_decile <- pivot_longer(meta_mod2,
+                        cols = c(Lang_LowDec_NoYes, 
+                                 Cognitive_LowDec_NoYes, 
+                                 Motor_LowDec_NoYes),
+                        names_to = "Which_Bayleys_Decile",
+                        values_to = "Composite_Score_Decile")
+
+# Fit multinomial logistic regression model
+long_df_decile <- within(long_df_decile, 
+                    Composite_Score_Decile <- relevel(Composite_Score_Decile, ref="no"))
+
+long_df_decile$Lang_Lowest_Decile <- factor(long_df_decile$Lang_Lowest_Decile, levels = c("no","yes"))
+long_df_decile$Cognitive_Lowest_Decile <- factor(long_df_decile$Cognitive_Lowest_Decile, levels = c("no","yes"))
+long_df_decile$Motor_Lowest_Decile <- factor(long_df_decile$Motor_Lowest_Decile,levels = c("no","yes"))
+
+# Separate for each Bayleys
+m_odd_cog <- multinom(Cognitive_Lowest_Decile ~ PMCA_birth + r_coi_nat + Sex + GA_combined2
+                  ,data = long_df_decile)
+coef_data_tidy_cog <- tidy(m_odd_cog)
+m_odd_lang <- multinom(Lang_Lowest_Decile ~ PMCA_birth + r_coi_nat + Sex + GA_combined2
+                  ,data = long_df_decile)
+coef_data_tidy_lang <- tidy(m_odd_lang)
+m_odd_motor <- multinom(Motor_Lowest_Decile ~ PMCA_birth + r_coi_nat + Sex + GA_combined2
+                  ,data = long_df_decile)
+coef_data_tidy_motor <- tidy(m_odd_motor)
+
+# Plot
+library(broom)
+coef_data_tidy_cog$bay_mode <- "cognitive"
+coef_data_tidy_lang$bay_mode <- "language"
+coef_data_tidy_motor$bay_mode <- "motor"
+# Merge them
+compiled <- rbind(coef_data_tidy_cog, coef_data_tidy_lang, coef_data_tidy_motor)
+compiled %>%
+  filter(!is.na(estimate), 
+         !is.na(std.error), 
+         !is.na(y.level),
+         !is.na(term),
+         term != "(Intercept)",
+         term != "GA_combined2",
+         term != "r_coi_nat",
+         term != "SexMale") %>%
+  ggplot(aes(x = y.level, y = estimate, color = term)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = estimate - std.error, ymax = estimate + std.error),
+                width = 0.5, position = position_dodge(width = 0.5),
+                size = 1.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+  facet_grid(bay_mode~.) +
+  coord_flip() +
+  labs(x = "Bayleys Domain", y = "Log-odds Coefficient Estimate", 
+       color = "PMCA Category",
+       title = "Log-odds Coefficient of Having a Bayleys Score in the Lowest Decile") +
+  theme_minimal() +
+  scale_color_manual(values = c( "#809bce","#b2df8a","#39a46c","#a999e3",
+                               "#1f78b4", "#f0D1b0"),
+                     labels = c("PMCA Complex Chronic",
+                              "PMCA Non-complex Chronix")) +
+  theme(text = element_text(family = "Arial", size = 15),
+        title = element_text(size = 15, margin = margin(1, 0, 1, 0, "cm")),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black", size = 1),
+        axis.line.x = element_line(color = "black", size = 1),
+        axis.title.x = element_text(vjust = -0.7, face = "bold",
+                                    margin = margin(0.7, 0, 0, 0, "cm")), 
+        axis.text.x = element_text(angle = 0, hjust = 0, vjust = -0.7, 
+                                   size = 15, face = "bold"),
+        axis.text.y = element_text(angle = 0, hjust = -0.7, vjust = -0.7, 
+                                   size = 15, face = "bold"),
+        axis.title.y = element_text(angle = 90, vjust = 1, face = "bold",
+                                    margin = margin(0, 1, 0, 0, "cm")), 
+        strip.text.x = element_text(angle = 0, hjust = 0),
+        strip.text.y = element_text(angle = 0, hjust = 1), # move strip text to the left
+        plot.margin = margin(2, 2, 2, 2, "cm"),
+        panel.spacing = unit(0.45, "lines"),
+        legend.position = "right",
+        legend.margin = margin(t=0),
+        legend.text = element_text(face = "bold", size = 15),
+        legend.title = NULL)
+
+```
+
+# Supplementary 
+
+### Supplementary Table 1 
+Re-coding of race and ethnicity variables
+
+### Supplementary Table 2 - done 
+Here the ref group is currently at non-chronic with white as the ref. 
+this can change if it's thought it would help interpretability. 
+
+```{r ST2, echo=FALSE}
+# Model for the first score
+cog_model_st3 <- lm(Cognitive_Composite_Score ~ GA_combined2 + Sex, 
+                      data=meta_mod2)
+# Model for the motor score
+motor_model_st3 <- lm(Motor_Composite_Score ~ GA_combined2 + Sex, 
+                       data=meta_mod2)
+# Model for the language score
+language_model_st3 <- lm(Lang_Composite_Score ~ GA_combined2 + Sex, 
+                          data=meta_mod2)
+
+# Models Side by Side
+sjPlot::tab_model(cog_model_st3,motor_model_st3,language_model_st3,
+                  title = "Developemental scores across Gest Age and Sex",
+                  string.pred = "Predictors",
+                  string.est = "Estimate",
+                  string.std = "std. Beta",
+                  string.ci = "95% CI",
+                  string.se = "std. Error",
+                  p.style = c("numeric"), 
+                  p.threshold = c(0.05),
+                  dv.labels = c("Cognitive Score", "Motor Score", "Language Score"),
+                  auto.label = FALSE,
+                  pred.labels = c("Intercept", 
+                                  "Gestational Age (months)",
+                                  "Sex, Male" ))
+```
+
+### Supplemenatry table 3 - done
+
+Looking at the interaction effect of GA and PMCA on Bayleys . For this one, need to decide on the
+best reference. Leaning towards the option below because it best explains figure 3. 
+ 
+```{r ST3 GA PMCA interaction Results, echo=FALSE}
+# Interaction models
+meta_mod2$PMCA_birth_cc <- factor(meta_mod2$PMCA_birth, 
+                                      levels = c("Complex Chronic",
+                                                 "Non-complex Chronic",
+                                                 "Non-chronic"))
+meta_mod2 <- within(meta_mod2, 
+                         PMCA_birth_cc <- relevel(PMCA_birth_cc,ref="Complex Chronic"))
+
+cog_ga_inter <- lm(Cognitive_Composite_Score ~ PMCA_birth_cc + PMCA_birth_cc*GA_combined2,
+                   data=meta_mod2)
+
+lang_ga_inter <- lm(Lang_Composite_Score ~ PMCA_birth_cc + PMCA_birth_cc*GA_combined2,
+                    data=meta_mod2)
+
+motor_ga_inter <- lm(Motor_Composite_Score ~ PMCA_birth_cc + PMCA_birth_cc*GA_combined2,
+                     data=meta_mod2)
+
+sjPlot::tab_model(cog_ga_inter,motor_ga_inter,lang_ga_inter,
+                  string.pred = "Predictors",
+                  string.est = "Estimate",
+                  string.std = "std. Beta",
+                  string.ci = "CI",
+                  string.se = "std. Error",
+                  p.style = c("numeric"), 
+                  p.threshold = c(0.05),
+                  dv.labels = c("Cognitive Score", "Motor Score", "Language Score"),
+                  auto.label = FALSE,
+                  pred.labels = c("Intercept (PMCA Complex Chronic)", 
+                                  "PMCA Non-complex Chronic",                                 
+                                  "PMCA Non-chronic",
+                                  "Gestational Age",
+                                  "PMCA NCC: Gest.Age",
+                                  "PMCA NC: Gest.Age"))
+```
+
+### Supplementary Table 4 - done 
+Adjusting for age at BSID assessment did not alter the observed associations between PMCA and BSID scores 
+
+```{r ST4 age of BSID and main, echo=FALSE}
+# Model for the cog score
+cog_model <- lm(Cognitive_Composite_Score ~ PMCA_birth + Bayleys_Age_Months + r_coi_nat + GA_combined2 + Sex,  data=meta_modS4)
+# Model for the motor score
+motor_model <- lm(Motor_Composite_Score ~ PMCA_birth + Bayleys_Age_Months + r_coi_nat + GA_combined2 + Sex,  data=meta_modS4)
+# Model for the language score
+language_model <- lm(Lang_Composite_Score ~ PMCA_birth + Bayleys_Age_Months + r_coi_nat + GA_combined2 + Sex,  data=meta_modS4)
+
+sjPlot::tab_model(cog_model,motor_model,language_model,
+                  title = "Developemental scores across PMCA, COI, Gestational Age and Sex",
+                  string.pred = "Predictors",
+                  string.est = "Estimate",
+                  string.std = "std. Beta",
+                  string.ci = "95% CI",
+                  string.se = "std. Error",
+                  p.style = c("numeric"), 
+                  p.threshold = c(0.05),
+                  dv.labels = c("Cognitive Score", "Motor Score", "Language Score"),
+                  auto.label = FALSE,
+                  pred.labels = c("Intercept (PMCA Non-chronic)", 
+                                  "PMCA Non-complex Chronic",                               
+                                  "PMCA Complex Chronic", 
+                                  "Bayleys Age (months)",
+                                  "Child Opp. Index",
+                                  "Sex, Male",
+                                  "Gestational Age"))
+```
+
+### Supplementary Table 5 - done 
+Associations between race and ethnicity characterizations and infant developmental domains without additional model covariates
+
+```{r ST5 race ethnicity bayleys alone, echo=FALSE}
+# Model for the cog score
+cog_model <- lm(Cognitive_Composite_Score ~ V3_RACE,  data=meta_mod5_6)
+# Model for the motor score
+motor_model <- lm(Motor_Composite_Score ~ V3_RACE,  data=meta_mod5_6)
+# Model for the language score
+language_model <- lm(Lang_Composite_Score ~ V3_RACE,  data=meta_mod5_6)
+
+sjPlot::tab_model(cog_model,motor_model,language_model,
+                  title = "Developemental scores across race and ethnicity alone",
+                  string.pred = "Predictors",
+                  string.est = "Estimate",
+                  string.std = "std. Beta",
+                  string.ci = "95% CI",
+                  string.se = "std. Error",
+                  p.style = c("numeric"), 
+                  p.threshold = c(0.05),
+                  dv.labels = c("Cognitive Score", "Motor Score", "Language Score"),
+                  auto.label = FALSE,
+                  pred.labels = c("Intercept (White)", 
+                                  "Hispanic or Latino",                               
+                                  "Black or African American", 
+                                  "Asian or Pacific Islander",
+                                  "Other Race",
+                                  "Non-conforming data"))
+```
+
+### Supplementary Table 6 - done
+Associations between race and ethnicity characterizations and infant developmental domains with additional model covariates
+
+```{r ST6 race covariates bayleys, echo=FALSE}
+# Model for the cog score
+cog_model <- lm(Cognitive_Composite_Score ~ V3_RACE + Sex + r_coi_nat + PMCA_birth + GA_combined2,  data=meta_mod5_6)
+# Model for the motor score
+motor_model <- lm(Motor_Composite_Score ~ V3_RACE + Sex + r_coi_nat + PMCA_birth + GA_combined2,  data=meta_mod5_6)
+# Model for the language score
+language_model <- lm(Lang_Composite_Score ~ V3_RACE + Sex + r_coi_nat + PMCA_birth + GA_combined2,  data=meta_mod5_6)
+
+sjPlot::tab_model(cog_model,motor_model,language_model,
+                  title = "Developemental scores across race and ethnicity alone",
+                  string.pred = "Predictors",
+                  string.est = "Estimate",
+                  string.std = "std. Beta",
+                  string.ci = "95% CI",
+                  string.se = "std. Error",
+                  p.style = c("numeric"), 
+                  p.threshold = c(0.05),
+                  dv.labels = c("Cognitive Score", "Motor Score", "Language Score"),
+                  auto.label = FALSE,
+                  pred.labels = c("Intercept (White)", 
+                                  "Hispanic or Latino",                               
+                                  "Black or African American", 
+                                  "Asian or Pacific Islander",
+                                  "Other Race",
+                                  "Non-conforming data",
+                                  "Sex, Male",
+                                  "Child Opportunity Scores",
+                                  "PMCA NCC",
+                                  "PMCA CC",
+                                  "Gestational Age"))
+```
+
+### Supplementary Figure 1
+Missing plot - Done in script 1 with original data.
+
+### Supplementary Figure 2A - done
+GA across PMCA boxplot
+
+```{r SFig 2A - GA PMCA, echo=FALSE}
+theme_set(theme_ridges())
+
+no_pmca_na <- long_df %>% 
+  filter(!is.na(PMCA_birth))
+
+ggplot(meta_mod2, aes(x = PMCA_birth, y = GA_combined2, fill = PMCA_birth)) +
+  geom_boxplot(alpha = 0.6, position = position_dodge(width = 0.9)) +
+  #stat_kwAllPairsDunnTest() +
+  #stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.2, position = position_dodge(width = 0.9)) +
+  #stat_summary(fun.y = mean, geom = "point", color = "black", size = 3, position = position_dodge(width = 0.9)) +
+  scale_fill_manual(values = c("#809bce", "#B2D3C2", "#7ec4cf", "#a6cee3", 
+                               "#1f78b4", "#b2df8a", "#39a46c"), 
+                    name = "PMCA") +
+  labs(x = "PMCA categorization", y = "Gestational Age (Weeks)") +
+  theme(axis.title.x = element_text(margin = margin(t = 20), 
+                                    hjust = 0.5,
+                                    size = 13,
+                                    face = "bold"),  
+        axis.title.y = element_text(margin = margin(r = 20), 
+                                    hjust = 0.5,
+                                    size = 12,
+                                    face = "bold"),
+        legend.title = element_text(size = 12, face = "bold"),
+        plot.margin = margin(1, 0, 1, 0.5, "cm"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),  #
+        axis.line.x = element_line(color = "black"), 
+        axis.line.y = element_line(color = "black"), 
+        axis.line.y.right = element_blank(),
+        legend.position = "right")
+```
+
+### Supplementary Figure 2B - done 
+GA across PMCA distributions
+
+```{r SFig 2B - GA distribuition by PMCA, echo=FALSE}
+theme_set(theme_ridges())
+
+no_pmca_na <- long_df %>% 
+  filter(!is.na(PMCA_birth))
+
+mean_scores <- no_pmca_na %>%
+  dplyr::group_by(PMCA_birth) %>%
+  dplyr::summarize(mean_score = mean(GA_combined2, na.rm = TRUE))
+
+meansd <- function(x, ...) {
+  mean <- mean(x)
+  c(mean)}
+
+ggplot(no_pmca_na, aes(x = GA_combined2, y = PMCA_birth)) +
+  geom_density_ridges2(aes(fill = PMCA_birth),
+                       quantile_lines = T, 
+                       quantile_fun = meansd,
+                       alpha = 0.6, 
+                       scale = 0.9) +
+  scale_fill_manual(values = c("#809bce", "#B2D3C2", "#7ec4cf", "#a6cee3", 
+                               "#1f78b4", "#b2df8a", "#39a46c"), 
+                    name = "PMCA Category") +
+  stat_summary(fun = mean, geom = "point", 
+               aes(shape = PMCA_birth),
+               size = 1.8, color = "black", 
+               position = position_nudge(y = 0.2),
+               show.legend = FALSE) +
+  scale_linetype_manual(values = c("solid", "dashed", "dotted")) +
+  labs(x = "Gestational Age (Weeks)", y = "PMCA category") +
+  theme(axis.title.x = element_text(margin = margin(t = 20), 
+                                    hjust = 0.5,
+                                    size = 13,
+                                    face = "bold"),  
+        axis.title.y = element_text(margin = margin(r = 20), 
+                                    hjust = 0.5,
+                                    size = 12,
+                                    face = "bold"),
+        legend.title = element_text(size = 12,
+                                    face = "bold"),  # Remove minor grid lines
+        axis.line.x = element_line(color = "black"), 
+        axis.line.y = element_line(color = "black"), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        axis.line.y.right = element_blank(),
+        plot.margin = margin(1, 0, 1, 0.5, "cm"),
+        legend.position = "right")
+```
+
+### Supplementary Figure 3 - done 
+Interaction of GA, PMCA on Bayleys 
+
+```{r SFig 3 - interaction GA PMCA Bayleys, echo=FALSE, warning=FALSE}
+# Create a single color scale with common values for all three plots
+color_scale <- scale_color_manual(values = c("#809bce", "#B2D3C2", "#7ec4cf"),
+                                  labels = c("Non-chronic", "Non-cpmplex Chronic", "Complex Chronic"))
+
+# Function to generate the plots
+generate_plot <- function(data, y_var, title) {
+  ggplot(data = data, 
+         aes(x = GA_combined2, y = !!sym(y_var), color = PMCA_birth),
+         legend.title = "test") + 
+    geom_smooth(method = 'lm', se = FALSE) +
+    labs(x = "Gestational Age (Weeks)", y = NULL, title = title) +
+    theme(
+      plot.title = element_text(hjust = 0.3, size = 14,
+                                face = "bold",
+                                margin = margin(t = 1, r = 0, b = 1, l = 0, 
+                                                unit = "cm")),
+      axis.title.x = element_text(hjust = 0.3, size = 14,
+                                  face = "bold",
+                                  margin = margin(t = 1, r = 0, b = 1, l = 0, 
+                                                  unit = "cm")),
+      axis.title.y = element_text(size = 14,face = "bold"),
+      panel.background = element_rect(fill = "white"),
+      plot.margin = margin(3, 1, 3, 1, "cm"),
+      plot.background = element_rect(fill = "white", 
+                                     colour = "white", linewidth = 1),
+      legend.position = "right",
+      legend.title = element_blank(),
+      panel.grid.major = element_blank(),  # Remove major grid lines
+      panel.grid.minor = element_blank(),
+      axis.line = element_line(colour = "black")) +
+    color_scale
+}
+
+# Generate plots for each composite score
+cog_GA <- generate_plot(meta_1_date_bayleys %>% filter(!is.na(PMCA_birth)), 
+                        "Cognitive_Composite_Score", "Cognitive Score")
+lang_GA <- generate_plot(meta_1_date_bayleys %>% filter(!is.na(PMCA_birth)), 
+                         "Lang_Composite_Score", "Language Score")
+motor_GA <- generate_plot(meta_1_date_bayleys %>% filter(!is.na(PMCA_birth)), 
+                          "Motor_Composite_Score", "Motor Score")
+cog_GA <- cog_GA + theme(legend.position = "none")
+motor_GA <- motor_GA + theme(legend.position = "none")
+
+# Arrange plots in a grid
+plot_grid(
+  cog_GA, motor_GA, lang_GA,
+  ncol = 3, align = "none",
+  labels = c("A","B","C"),
+  label_size = 10,
+  hjust = -2.2,
+  vjust = 18,
+  rel_widths = c(5, 5, 10))
+```
+
+### Supplementary Figure 4 - done 
+COI by race and ethnicity
+
+```{r SFig4 - COI by race ethnicity, echo=FALSE}
+meta_1_date_bayleys %>%
+  filter(!is.na(PMCA_birth)) %>%
+  mutate(V3_RACE = factor(V3_RACE, 
+                          levels = c("Middle Eastern or North African", 
+                                     "Asian or Pacific Islander", 
+                                     "White",
+                                     "Hispanic or Latino",
+                                     "Black or African American", 
+                                     "Other Race", 
+                                     "Nonconforming data"))) %>%
+  ggplot(aes(x = V3_RACE, y = r_coi_nat)) +
+  geom_boxplot(aes(color = V3_RACE), width = 0.8, outliers = FALSE) + 
+  xlab("Race and/or Ethnicity") +
+  ylab("Child Opportunity Index Score") +
+  #ggtitle("Child Opportunity differed across Race and/or Ethnicity") +
+  scale_x_discrete(labels = c("Middle Eastern or North African" = "MENA",
+                               "Asian or Pacific Islander" = "A/P",
+                               "White" = "W", 
+                               "Hispanic or Latino" = "H/L",                            
+                               "Black or African American" = "AA",
+                               "Other Race" = "OR",
+                               "Nonconforming data" = "NC")) +
+  labs(color = 'Race and/or Ethnicity') + 
+  theme_minimal() +
+  scale_color_manual(values = c("#B4DCE3","#a999e3","#D1E4DB","#809bce",
+                                "#B6C4E1", "#39a46c", "#b2df8a"),
+                     labels = c("Middle Eastern or North African (MENA)",
+                                "Asian or Pacific Islander (A/P)",
+                                "White (W)",
+                                "Hispanic or Latino (H/L)",
+                                "Black or African American (AA)",
+                                "Other Race (OR)",
+                                "Nonconforming data (NC)")) +
+  theme(text = element_text(family = "Times", size = 15),
+        title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.line.x = element_line(color = "black"),
+        axis.title.x = element_text(vjust = -1.1, size = 15, 
+                                    margin = margin(t = 0.5, unit = "cm")),
+        axis.title.y = element_text(margin = margin(r = 0.5, unit = "cm")),
+        strip.text.x = element_text(angle = 0, hjust = 0),
+        axis.text.x = element_text(angle = 0, hjust = 0, vjust = -0.7, size = 15),
+        plot.margin = margin(2, 1, 2, 1, "cm"),
+        panel.spacing = unit(0.45, "lines"))
+```
+
+### Stats to compare COI across race/eth -done
+This was added to the labeling of the plot above in biorender 
+
+```{r Stats for SFig 4, echo=FALSE}
+meta_1_date_bayleys$r_coi_nat <- as.numeric(meta_1_date_bayleys$r_coi_nat)
+meta_1_date_bayleys$V3_RACE <- as.factor(meta_1_date_bayleys$V3_RACE)
+capture.output(dun_V3coi <-
+  as.data.frame(dunn.test(
+    x = meta_1_date_bayleys$r_coi_nat,
+    g = meta_1_date_bayleys$V3_RACE,
+    method = "bonferroni",
+    table = TRUE,
+    kw = TRUE,
+    label = TRUE,
+    alpha = 0.05)), file = "NULL")
+dun_V3coi
+dunn_output <- dunn.test(
+    x = meta_1_date_bayleys$r_coi_nat,
+    g = meta_1_date_bayleys$V3_RACE, method = "bonferroni")
+
+# Format the output
+formatted_output <- capture.output(print(dunn_output))
+```
+
+### Supplementary Figure 5 
+Is there an interaction between PMCA and coi on bayleys scores?
+There does seem to be an effect of PMCA:COI on language, particularly for non-chronic complex infants 
+
+```{r SFig 5 - COI PMCA Bayleys, echo=FALSE}
+# Create a single color scale with common values for all three plots
+color_scale <- scale_color_manual(values = c("#809bce", "#B2D3C2", "#7ec4cf"),
+                                  labels = c("Non-chronic", "Non-cpmplex Chronic", "Complex Chronic"))
+
+# Function to generate the plots
+generate_plot <- function(data, y_var, title) {
+  ggplot(data = data, 
+         aes(x = r_coi_nat, y = !!sym(y_var), color = PMCA_birth),
+         legend.title = "test") + 
+    geom_smooth(method = 'lm', se = FALSE) +
+    labs(x = "Child Opp Index Score", y = NULL, title = title) +
+    theme(
+      plot.title = element_text(hjust = 0.3, size = 14,
+                                margin = margin(t = 1, r = 0, b = 1, l = 0, 
+                                                unit = "cm")),
+      axis.title.x = element_text(hjust = 0.3, size = 14,
+                                  face = "bold",
+                                  margin = margin(t = 1, r = 0, b = 1, l = 0, 
+                                                  unit = "cm")),
+      axis.title.y = element_text(size = 14, face = "bold"),
+      panel.background = element_rect(fill = "white"),
+      plot.margin = margin(3, 1, 3, 1, "cm"),
+      plot.background = element_rect(fill = "white", 
+                                     colour = "white", linewidth = 1),
+      legend.position = "right",
+      legend.title = element_blank(),
+      panel.grid.major = element_blank(),  # Remove major grid lines
+      panel.grid.minor = element_blank(),
+      axis.line = element_line(colour = "black")) +
+    color_scale
+}
+
+# Generate plots for each composite score
+cog_GA <- generate_plot(meta_1_date_bayleys %>% filter(!is.na(PMCA_birth)), 
+                        "Cognitive_Composite_Score", "Cognitive Composite Score")
+lang_GA <- generate_plot(meta_1_date_bayleys %>% filter(!is.na(PMCA_birth)), 
+                         "Lang_Composite_Score", "Language Composite Score")
+motor_GA <- generate_plot(meta_1_date_bayleys %>% filter(!is.na(PMCA_birth)), 
+                          "Motor_Composite_Score", "Motor Composite Score")
+cog_GA <- cog_GA + theme(legend.position = "none")
+motor_GA <- motor_GA + theme(legend.position = "none")
+
+# Arrange plots in a grid
+plot_grid(
+  cog_GA, motor_GA, lang_GA,
+  ncol = 3, align = "none",
+  labels = c("A","B","C"),
+  label_size = 10,
+  hjust = -2.2,
+  vjust = 18,
+  rel_widths = c(5, 5, 10))
+```
+
+
+# EXTRA's (not in paper)
+Gestational ages of infants across PMCA categories differed only for Hispanic and/or Latino and other race
+
+```{r}
+meta_1_date_bayleys %>% 
+  filter(!is.na(PMCA_birth), V3_RACE != "Middle Eastern or North African") %>% 
+  ggplot(aes(x = PMCA_birth, y = GA_combined2)) +
+  geom_boxplot(aes(color=PMCA_birth)) + 
+  #geom_jitter(aes(color=PMCA_birth),alpha=.5) +
+  xlab(NULL) +
+  ylab("Gestational Age (weeks)") +
+  ggtitle("Gestational Ages by PMCA Complexity and Ethnicity") +
+  scale_x_discrete(labels = c("Complex Chronic" = "CC", 
+                              "Non-complex Chronic" = "NCC", 
+                              "Non-chronic" = "NC")) +
+  labs(color='PMCA Complexity') + 
+  facet_wrap( ~ V3_RACE) +
+  theme_minimal() +
+  scale_color_manual(values = c("#809bce", "#B2D3C2","#7ec4cf")) +
+  theme(text = element_text(family = "Arial"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black")) +
+  stat_compare_means(method = "anova",
+                     label.y = 43,
+                     label.x = 1.4,
+                     size = 3) + # Adjust position and size
+  stat_compare_means(aes(label = after_stat(p.signif)),
+                     method = "t.test", ref.group = "0.5",
+                     label.y = 30,
+                     label.x = "mean",
+                     size = 3)
+```
+
+### Extra 2
+Bayleys scores across race and ethnicity 
+
+```{r}
+# ggplot(no_pmca_na, aes(x = Composite_Score, y = Which_Bayleys)) +
+#   geom_density_ridges2(aes(fill = V3_RACE),
+#                        quantile_lines = T, 
+#                        quantile_fun = meansd,
+#                        alpha = 0.6, 
+#                        scale = 1.2) +
+#   scale_fill_manual(values = c("#809bce", "#B2D3C2", "#7ec4cf", "#a6cee3", 
+#                                "#1f78b4", "#b2df8a", "#39a46c"), 
+#                     name = "Race Ethnicity") +
+#   stat_summary(fun = mean, geom = "point", 
+#                aes(shape = V3_RACE),
+#                size = 1.8, color = "black", 
+#                position = position_nudge(y = 0.2),
+#                show.legend = FALSE) +
+#   scale_linetype_manual(values = c("solid", "dashed", "dotted")) +
+#   labs(x = "Bayleys Composite Score", y = "Developemental Domain") +
+#   theme(axis.title.x = element_text(margin = margin(t = 20), 
+#                                     hjust = 0.5,
+#                                     size = 13),  
+#         axis.title.y = element_text(margin = margin(r = 20), 
+#                                     hjust = 0.5,
+#                                     size = 12),
+#         legend.title = element_text(size = 12),
+#         plot.margin = margin(1, 0, 1, 0.2, "cm"),
+#         legend.position = "right")
+```
+
+### Extra 3
+
+Gestational age across PMCA groups and Race/Ethnicity 
+
+```{r GA PMCA race ethnicity, echo=FALSE}
+meta_1_date_bayleys %>% 
+  filter(!is.na(PMCA_birth), V3_RACE != "Middle Eastern or North African") %>% 
+  ggplot(aes(x = V3_RACE, y = GA_combined2)) +
+  geom_boxplot(aes(color=V3_RACE)) + 
+  #geom_jitter(aes(color=V3_RACE),alpha=.5) +
+  xlab("Race") +
+  ylab("Gestational Age (weeks)") +
+  ggtitle("Gestational Ages by PMCA Complexity across Race and/or Ethnicity") +
+  scale_x_discrete(labels = c("White" = "W", 
+                              "Hispanic or Latino" = "H/L", 
+                              "Black or African American" = "AA",
+                              "Asian or Pacific Islander" = "A/P",
+                              "Other Race" = "O",
+                              "Nonconforming data" = "NC")) +
+  labs(color='Race and/or Ethnicity') + 
+  facet_wrap( ~ PMCA_birth,
+              strip.position = "bottom",
+              labeller = labeller(
+                PMCA_birth = c(
+                  "Complex Chronic" = "PMCA: Complex Chronic",
+                  "Non-chronic" = "PMCA: Non-chronic",
+                  "Non-complex Chronic" = "PMCA: Non-complex Chronic"))) +
+  theme_minimal() +
+  scale_color_manual(values = c("#809bce", "#f0D1b0","#7ec4cf","#a999e3", 
+                               "#1f78b4", "#39a46c", "#b2df8a"),
+                     labels = c("White (W)", 
+                              "Hispanic or Latino (H/L)",
+                              "Black or African American (AA)",
+                              "Asian or Pacific Islander (A/P)",
+                              "Other Race (O)",
+                              "Nonconforming data (NC)")) +
+  theme(text = element_text(family = "Arial", size = 10),
+        title = element_text(size = 10),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_blank(),
+  axis.line = element_line(color = "black"),
+  axis.line.x = element_line(color = "black"),
+  axis.title.x = element_text( vjust = -0.9),
+  strip.text.x = element_text(angle = 0, hjust = 0),
+  axis.text.x = element_text(angle = 0, hjust = 0, vjust = -0.7),
+  plot.margin = margin(2, 0, 2, 0.2, "cm"),
+  panel.spacing = unit(0.7, "lines") ) 
+```
+
