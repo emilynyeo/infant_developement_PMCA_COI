@@ -1,7 +1,5 @@
 #  Exploring Associations of Pediatric Medical Complexity and Neighborhood Opportunity with Developmental Outcomes in High-Risk Infants Living in Southern California
 
-![05D2CCEF-80A8-46AD-B70D-AD2C5F6A1C0F_1_201_a](https://github.com/emilynyeo/infant_developement_PMCA_COI/assets/104112036/95ab97f6-3dca-464f-828f-c9bb0d3cab11)
-
 This code assessed key determinants of infant development among those from a HRIF clinic located in an urban children’s hospital in Southern California. We investigated associations between infant medical complexity, as defined by the Pediatric Medical Complexity Algorithm (PMCA), and infant neighbourhoods using the Child Opportunity Index (COI), with infant developmental domains, as measured by the Bayley Scales of Infant and Toddler Development (BSID), which is considered the gold standard for evaluating infant cognitive, language and motor development from birth to 42 months. 
 
 The input data utilized was deidentified medical record data. This may be available upon request with corresponding authors. The scripts included in this repo, along with their functionality, are outlined below. 
@@ -13,6 +11,8 @@ The input data utilized was deidentified medical record data. This may be availa
 - `3.stats_figures.Rmd` : This script runs the main models, statistics, and figures included in the paper.
 
 Should you have any further questions, please reach out to emily.yeo@colorado.edu. Details on where to find the paper will be included upon publication. 
+
+![05D2CCEF-80A8-46AD-B70D-AD2C5F6A1C0F_1_201_a](https://github.com/emilynyeo/infant_developement_PMCA_COI/assets/104112036/95ab97f6-3dca-464f-828f-c9bb0d3cab11)
 
 # Reproducible Code Artifacts 
 
