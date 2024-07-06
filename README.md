@@ -1,12 +1,18 @@
 #  Exploring Associations of Pediatric Medical Complexity and Neighborhood Opportunity with Developmental Outcomes in High-Risk Infants Living in Southern California
 
+![05D2CCEF-80A8-46AD-B70D-AD2C5F6A1C0F_1_201_a](https://github.com/emilynyeo/infant_developement_PMCA_COI/assets/104112036/95ab97f6-3dca-464f-828f-c9bb0d3cab11)
+
 This code assessed key determinants of infant development among those from a HRIF clinic located in an urban children’s hospital in Southern California. We investigated associations between infant medical complexity, as defined by the Pediatric Medical Complexity Algorithm (PMCA), and infant neighbourhoods using the Child Opportunity Index (COI), with infant developmental domains, as measured by the Bayley Scales of Infant and Toddler Development (BSID), which is considered the gold standard for evaluating infant cognitive, language and motor development from birth to 42 months. 
 
 The input data utilized was deidentified medical record data. This may be available upon request with corresponding authors. The scripts included in this repo, along with their functionality, are outlined below. 
 
-- `1.clean.R` : A script to read in raw data and clean and process the dataframes for downstream use. This includes things such as changing variable names, dealing with NA or out of range values, and assessing baseline summary stats.
+- `1.PMCA_classification.R` : This script runs the pediatric medical complexity algorithm on first encounter diagnostic codes of infants. 
 
-- `2.PMCA.R` : 
+- `2.cleaning_data.Rmd` : A script to read in raw data and clean and process the dataframes for downstream use. This includes things such as changing variable names, dealing with NA or out of range values, and assessing baseline summary stats.
+
+- `3.stats_figures.Rmd` : This script runs the main models, statistics, and figures included in the paper.
+
+Should you have any further questions, please reach out to emily.yeo@colorado.edu. Details on where to find the paper will be included upon publication. 
 
 # Reproducible Code Artifacts 
 
