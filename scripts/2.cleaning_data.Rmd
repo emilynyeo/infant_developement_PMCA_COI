@@ -22,7 +22,7 @@ pacman::p_load(knitr, tidyverse, magrittr, lme4, lmerTest, GGally, corrplot,
 #set to files directory
 setwd("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/rawdata")
 # Table 1 Unique Patient info ####
-Table_1 <- read.csv("Table1_UniquePatients_0615.csv",               
+Table_1 <- read.csv("Table1_UniquePatients_0615.csv",                     
                     na = c("NA", "don't know", "","    .",
                            "Missing: Not provided",999.00)) %>%
             dplyr::rename(Research_ID = "Research.ID",
@@ -588,11 +588,110 @@ T_age <- merge(T2_3, meta1bay_age, by = c("Research_ID"),
 #     file='meta_bay_checks_july5.RData')
 ```
 
+# After Reviews
+
+## 1. Make a descriptive table of those with vs. without Bayleys Scores
+
+```{r}
+# Filter Table_1_above20 to keep only rows with Research_ID not in Table_5
+no_bayley <- table_df %>%
+  anti_join(subset_bay_and, by = "Research_ID") %>% 
+  mutate(has_bay = "no") %>% 
+  anti_join(Table_5, by = "Research_ID")
+
+has_bay <- table_df %>% 
+  anti_join(no_bayley, by = "Research_ID") %>% 
+  dplyr::mutate(has_bay = "yes")
+
+both <- dplyr::bind_rows(no_bayley, has_bay)
+
+# sum of these is 1556
+unique(no_bayley$Research_ID) %>% length()
+unique(has_bay$Research_ID) %>% length()
+length(intersect(no_bayley$Research_I, has_bay$Research_ID))
+
+## reorder pmca cats for plotting later
+both$pmca_first <- factor(both$pmca_first, 
+                                  levels = c("Non-chronic", 
+                                             "Non-complex Chronic", 
+                                             "Complex Chronic"))
+# Breaking up COI
+quantile(both$r_coi_nat, c(0:3/3), na.rm=TRUE)
+both$coi_cat <- ifelse(both$r_coi_nat <= 16,"low",
+                               ifelse(both$r_coi_nat > 16 & both$r_coi_nat <= 41.4, "medium",
+                                      ifelse(both$r_coi_nat > 41.4, "high", NA)))
+
+### Gestational Age Categories ####
+both$Gestational_Class = ifelse(test = both$GA_combined2 < 28,
+                                        yes = "Extremely_Preterm",
+                                        no = ifelse(test = both$GA_combined2 < 32,
+                                                    yes = "Very_Preterm",
+                                                    no = ifelse(test = both$GA_combined2 < 34,
+                                                                yes = "Moderate_Preterm",
+                                                                no = ifelse(test = both$GA_combined2 <= 37,
+                                                                            yes = "Late_Preterm",
+                                                                            no = "Term"))))    
+## reorder cats for plotting later
+both$Gestational_Class <- factor(both$Gestational_Class, 
+                                         levels = c("Extremely_Preterm", 
+                                                    "Very_Preterm",
+                                                    "Moderate_Preterm",
+                                                    "Late_Preterm",
+                                                    "Term"))
 
 
+both_unique <- both %>% dplyr::select(Research_ID, Sex, GA_combined2,
+                  V3_RACE, coi_cat, pmca_first, has_bay) %>% unique()
 
+769 + 796
+```
 
+Make a table comparing those who do vs. dont have Bayleys scores 
 
+```{r}
+# which vars to include 
+descrip_vars <- c("Sex", "GA_combined2",
+                  "V3_RACE",
+                  "coi_cat",
+                  "pmca_first", 
+                  "has_bay")
+desc_labels <- c("Sex","Gestational Age",
+                 "Race and/or Ethnicity",
+                 "Child Opp Index",
+                 "PMCA Category",
+                 "Did they have Bayleys")
+
+des_cat_vars <- c("Sex","V3_RACE","coi_cat","pmca_first", "has_bay")
+
+descrip_table <- dplyr::select(both_unique, one_of(descrip_vars))
+
+labelled::var_label(descrip_table) <- desc_labels
+descriptive_T1 <- CreateTableOne(vars = descrip_vars, 
+                                   data = descrip_table, 
+                                   factorVars = des_cat_vars, 
+                                   strata = "has_bay",
+                                   includeNA=T,
+                                   addOverall = T,
+                                   test = TRUE,
+                                   testApprox = chisq.test,
+                                   testNormal = oneway.test,
+                                   argsNormal = list(var.equal = TRUE),
+                                   testNonNormal = kruskal.test)
+#kable(summary(descriptive_T1))
+d_T1 <- print(descriptive_T1,
+               catDigits = 1, 
+               contDigits = 1, 
+               varLabels = T,
+               exact = "stage", 
+               quote = FALSE, 
+               noSpaces = TRUE, printToggle = FALSE)
+## Save to html
+d_T1 <- d_T1 %>% 
+     kable(caption = "Baseline Characteristics") %>%
+     kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+d_T1
+```
 
 
 

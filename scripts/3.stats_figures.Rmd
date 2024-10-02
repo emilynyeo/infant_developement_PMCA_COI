@@ -5,7 +5,6 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 #clear environment
@@ -1163,3 +1162,105 @@ meta_1_date_bayleys %>%
   panel.spacing = unit(0.7, "lines") ) 
 ```
 
+# Reviewer comments 
+
+# 2. Compare Term and Pre-term
+
+"The term infants seem to have gotten lost here. It is not clear why they were included. The mean GA of the CC group is higher than the GA of the other groups. Is that because there were more term infants in the CC group? We need to see the percent of term infants in the 3 medical groups."
+
+```{r}
+### Add Gestational Age Categories ####
+t1_descriptives$Gestational_Class = ifelse(test = t1_descriptives$GA_combined2 < 28,
+                                        yes = "Extremely_Preterm",
+                                        no = ifelse(test = t1_descriptives$GA_combined2 < 32,
+                                                    yes = "Very_Preterm",
+                                                    no = ifelse(test = t1_descriptives$GA_combined2 < 34,
+                                                                yes = "Moderate_Preterm",
+                                                                no = ifelse(test = t1_descriptives$GA_combined2 <= 37,
+                                                                            yes = "Late_Preterm",
+                                                                            no = "Term"))))    
+## reorder cats for plotting later
+t1_descriptives$Gestational_Class <- factor(t1_descriptives$Gestational_Class, 
+                                         levels = c("Extremely_Preterm", 
+                                                    "Very_Preterm",
+                                                    "Moderate_Preterm",
+                                                    "Late_Preterm",
+                                                    "Term"))
+```
+
+Make a table : 
+
+```{r}
+# which vars to include 
+descrip_vars <- c("Sex","GA_combined2", "Gestational_Class",
+                  "V3_RACE","coi_cat",
+                  "Cognitive_Composite_Score",
+                  "Motor_Composite_Score",
+                  "Lang_Composite_Score",
+                  "PMCA_birth",
+                  "Bayleys_Age_Months",
+                  "age_at_enc_months")
+desc_labels <- c("Sex","Gestational Age", "Gestational Age Category",
+                 "Race and/or Ethnicity","Child Opp Index",
+                 "Cognitive Bayleys Score",
+                 "Motor Bayleys Score",
+                 "Language Bayleys Score",
+                 "PMCA Category",
+                 "Age at first Bayleys",
+                 "Age at first encounter")
+des_cat_vars <- c("Sex","Gestational_Class", "V3_RACE","coi_cat","PMCA_birth")
+
+descrip_table <- dplyr::select(t1_descriptives, one_of(descrip_vars))
+
+labelled::var_label(descrip_table) <- desc_labels
+descriptive_T1_GA <- CreateTableOne(vars = descrip_vars, 
+                                   data = descrip_table, 
+                                   factorVars = des_cat_vars, 
+                                   strata = "PMCA_birth",
+                                   includeNA=T,
+                                   addOverall = T,
+                                   test = TRUE,
+                                   testApprox = chisq.test,
+                                   testNormal = oneway.test,
+                                   argsNormal = list(var.equal = TRUE),
+                                   testNonNormal = kruskal.test)
+#kable(summary(descriptive_T1))
+d_T1_GA <- print(descriptive_T1_GA,
+               catDigits = 1, 
+               contDigits = 1, 
+               varLabels = T,
+               exact = "stage", 
+               quote = FALSE, 
+               noSpaces = TRUE, printToggle = FALSE)
+## Save to a CSV file
+#write.csv(d_T1, 
+#          file = "/Users/emily/projects/research/ADOR/CHLA_clean/outputs/tables/Table1_April12.csv")
+## Save to html
+d_T1_GA <- d_T1_GA %>% 
+     kable(caption = "Baseline Characteristics") %>%
+     kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+#write.csv(d_T1, 
+#          file = "/Users/emily/projects/research/ADOR/CHLA_clean/outputs/tables/Table1_April12.html")
+d_T1_GA
+```
+
+# 3. Age at Bayleys across PMCA groups
+
+Table 1 shows that the "first" Bayley scores did not differ between the 3 medical groups. However, supplementary Table 4 shows differences between the 3 medical groups in age at Bayley. Was this not the "first" Bayley?
+
+```{r}
+# One-way ANOVA
+anova_result <- aov(Bayleys_Age_Months ~ PMCA_birth, data = meta_1_date_bayleys)
+# Check assumptions
+shapiro.test(residuals(anova_result))  # Not normal -> Kriskal Wallis 
+leveneTest(Bayleys_Age_Months ~ PMCA_birth, data = meta_1_date_bayleys)  # Homogeneity of variance
+
+# No difference in Bay Age across PMCA
+kruskal.test(Bayleys_Age_Months ~ PMCA_birth, data = meta_1_date_bayleys)
+
+# Post hoc Dunn's test with no Bonferroni correction, no difference. 
+dunn.test(x = meta_1_date_bayleys$Bayleys_Age_Months, 
+          g = meta_1_date_bayleys$PMCA_birth)
+```
+
+To make matters more complicated Infant age at Bayley assessment was inversely correlated with all three Bayley composite scores. Please explain.
