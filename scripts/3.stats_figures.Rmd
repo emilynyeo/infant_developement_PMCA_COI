@@ -19,8 +19,8 @@ pacman::p_load(knitr, tidyverse, magrittr, lme4, lmerTest, GGally, corrplot,
                ggridges, car, cowplot, dunn.test, broom)
 
 #smb://ucbfiles.colorado.edu
-load("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/clean_inputs/aapril11/meta_bay_april11.RData")
-#load("~/projects/research/ADOR/CHLA_clean//clean_inputs/meta_bay_april11.RData")
+#load("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/clean_inputs/aapril11/meta_bay_april11.RData")
+load("/Users/emily/projects/research/ADOR/CHLA_clean/clean_inputs/meta_bay_april11.RData")
 #ages <- fread("/Users/emily/projects/research/ADOR/CHLAneuro/Output/enc_bayley_ages_first_0618.csv")
 ages <- fread("/Users/emily/projects/research/ADOR/CHLAneuro/Output/enc_bayley_ages_first_0705.csv")
 ```
@@ -89,11 +89,11 @@ descrip_vars <- c("Sex","GA_combined2","V3_RACE","coi_cat",
                   "Bayleys_Age_Months",
                   "age_at_enc_months")
 desc_labels <- c("Sex","Gestational Age","Race and/or Ethnicity","Child Opp Index",
-                 "Cognitive Bayleys Score",
-                 "Motor Bayleys Score",
-                 "Language Bayleys Score",
+                 "Cognitive BSID Score",
+                 "Motor BSID Score",
+                 "Language BSID Score",
                  "PMCA Category",
-                 "Age at first Bayleys",
+                 "Age at first BSID",
                  "Age at first encounter")
 des_cat_vars <- c("Sex","V3_RACE","coi_cat","PMCA_birth")
 
@@ -288,8 +288,8 @@ ggplot(no_pmca_na, aes(x = PMCA_birth, y = Composite_Score, fill = Which_Bayleys
   #stat_summary(fun.y = mean, geom = "point", color = "black", size = 3, position = position_dodge(width = 0.9)) +
   scale_fill_manual(values = c("#809bce", "#B2D3C2", "#7ec4cf", "#a6cee3", 
                                "#1f78b4", "#b2df8a", "#39a46c"), 
-                    name = "Bayleys Developmental Domain") +
-  labs(x = "PMCA categorization", y = "Bayleys Composite Score") +
+                    name = "BSID Developmental Domain") +
+  labs(x = "PMCA categorization", y = "BSID Composite Score") +
   scale_y_continuous(sec.axis = dup_axis(label = NULL,
                                          name = NULL),
                      expand = expand_scale(mult = c(0, 0)),
@@ -346,7 +346,7 @@ ggplot(no_pmca_na, aes(x = Composite_Score, y = Which_Bayleys)) +
                position = position_nudge(y = 0.2),
                show.legend = FALSE) +
   scale_linetype_manual(values = c("solid", "dashed", "dotted")) +
-  labs(x = "Bayleys Composite Score", y = "Bayleys Developemental Domain") +
+  labs(x = "BSID Composite Score", y = "BSID Developemental Domain") +
   theme(axis.title.x = element_text(margin = margin(t = 20), 
                                     hjust = 0.5,
                                     size = 13),  
@@ -378,11 +378,17 @@ lang_emmeans <- summary(emmeans(language_model, ~ PMCA_birth))
 # Display parameters
 ci_barwidth <- .35 # CI bar size
 cog_emmeans$PMCA_birth <- factor(cog_emmeans$PMCA_birth, 
-                                  levels = c("Non-chronic", "Non-complex Chronic", "Complex Chronic")) # Order
+                                  levels = c("Non-chronic", 
+                                             "Non-complex Chronic", 
+                                             "Complex Chronic")) # Order
 motor_emmeans$PMCA_birth <- factor(motor_emmeans$PMCA_birth, 
-                                  levels = c("Non-chronic", "Non-complex Chronic", "Complex Chronic")) # Order 
+                                  levels = c("Non-chronic", 
+                                             "Non-complex Chronic", 
+                                             "Complex Chronic")) # Order 
 lang_emmeans$PMCA_birth <- factor(lang_emmeans$PMCA_birth, 
-                                  levels = c("Non-chronic", "Non-complex Chronic", "Complex Chronic")) # Order
+                                  levels = c("Non-chronic", 
+                                             "Non-complex Chronic", 
+                                             "Complex Chronic")) # Order
 # Function to shorten x-axis labels
 shorten_labels <- function(x) {
   ifelse(x == "Non-chronic", "NC", 
@@ -459,9 +465,9 @@ create_plot <- function(data, y_label, title) {
 
 
 # Create individual plots
-cog_plot <- create_plot(cog_emmeans, "Cognitive Bayley's Score", "Cognitive Score by PMCA")
-motor_plot <- create_plot(motor_emmeans, "Motor Bayley's Score", "Motor Score by PMCA")
-lang_plot <- create_plot(lang_emmeans, "Language Bayley's Score", "Language Score by PMCA")
+cog_plot <- create_plot(cog_emmeans, "Cognitive BSID Score", "Cognitive Score by PMCA")
+motor_plot <- create_plot(motor_emmeans, "Motor BSID Score", "Motor Score by PMCA")
+lang_plot <- create_plot(lang_emmeans, "Language BSID Score", "Language Score by PMCA")
 
 # Combine plots using patchwork
 final_plot <- cog_plot + motor_plot + lang_plot + plot_layout(ncol = 3)
@@ -553,9 +559,9 @@ compiled %>%
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
   facet_grid(bay_mode~.) +
   coord_flip() +
-  labs(x = "Bayleys Domain", y = "Log-odds Coefficient Estimate", 
+  labs(x = "BSID Domain", y = "Log-odds Coefficient Estimate", 
        color = "PMCA Category",
-       title = "Log-odds Coefficient of Having a Bayleys Score in the Lowest Decile") +
+       title = "Log-odds Coefficient of Having a BSID Score in the Lowest Decile") +
   theme_minimal() +
   scale_color_manual(values = c( "#809bce","#b2df8a","#39a46c","#a999e3",
                                "#1f78b4", "#f0D1b0"),
@@ -690,7 +696,7 @@ sjPlot::tab_model(cog_model,motor_model,language_model,
                   pred.labels = c("Intercept (PMCA Non-chronic)", 
                                   "PMCA Non-complex Chronic",                               
                                   "PMCA Complex Chronic", 
-                                  "Bayleys Age (months)",
+                                  "BSID Age (months)",
                                   "Child Opp. Index",
                                   "Sex, Male",
                                   "Gestational Age"))
@@ -858,7 +864,9 @@ Interaction of GA, PMCA on Bayleys
 ```{r SFig 3 - interaction GA PMCA Bayleys, echo=FALSE, warning=FALSE}
 # Create a single color scale with common values for all three plots
 color_scale <- scale_color_manual(values = c("#809bce", "#B2D3C2", "#7ec4cf"),
-                                  labels = c("Non-chronic", "Non-cpmplex Chronic", "Complex Chronic"))
+                                  labels = c("Non-chronic", 
+                                             "Non-cpmplex Chronic", 
+                                             "Complex Chronic"))
 
 # Function to generate the plots
 generate_plot <- function(data, y_var, title) {
@@ -898,6 +906,7 @@ motor_GA <- generate_plot(meta_1_date_bayleys %>% filter(!is.na(PMCA_birth)),
                           "Motor_Composite_Score", "Motor Score")
 cog_GA <- cog_GA + theme(legend.position = "none")
 motor_GA <- motor_GA + theme(legend.position = "none")
+lang_GA <- lang_GA + theme(legend.position = "none")
 
 # Arrange plots in a grid
 plot_grid(
@@ -907,7 +916,7 @@ plot_grid(
   label_size = 10,
   hjust = -2.2,
   vjust = 18,
-  rel_widths = c(5, 5, 10))
+  rel_widths = c(5, 5, 5))
 ```
 
 ### Supplementary Figure 4 - done 
@@ -1031,8 +1040,10 @@ lang_GA <- generate_plot(meta_1_date_bayleys %>% filter(!is.na(PMCA_birth)),
                          "Lang_Composite_Score", "Language Composite Score")
 motor_GA <- generate_plot(meta_1_date_bayleys %>% filter(!is.na(PMCA_birth)), 
                           "Motor_Composite_Score", "Motor Composite Score")
+
 cog_GA <- cog_GA + theme(legend.position = "none")
 motor_GA <- motor_GA + theme(legend.position = "none")
+lang_GA <- lang_GA + theme(legend.position = "none")
 
 # Arrange plots in a grid
 plot_grid(
@@ -1042,7 +1053,7 @@ plot_grid(
   label_size = 10,
   hjust = -2.2,
   vjust = 18,
-  rel_widths = c(5, 5, 10))
+  rel_widths = c(5, 5, 5))
 ```
 
 
@@ -1193,7 +1204,7 @@ Make a table :
 ```{r}
 # which vars to include 
 descrip_vars <- c("Sex","GA_combined2", "Gestational_Class",
-                  "V3_RACE","coi_cat",
+                  "V3_RACE","coi_cat","r_coi_nat",
                   "Cognitive_Composite_Score",
                   "Motor_Composite_Score",
                   "Lang_Composite_Score",
@@ -1201,12 +1212,13 @@ descrip_vars <- c("Sex","GA_combined2", "Gestational_Class",
                   "Bayleys_Age_Months",
                   "age_at_enc_months")
 desc_labels <- c("Sex","Gestational Age", "Gestational Age Category",
-                 "Race and/or Ethnicity","Child Opp Index",
-                 "Cognitive Bayleys Score",
-                 "Motor Bayleys Score",
-                 "Language Bayleys Score",
+                 "Race and/or Ethnicity",
+                 "Child Opp Index Rank", "Child Opp Index Score",
+                 "Cognitive BSID Score",
+                 "Motor BSID Score",
+                 "Language BSID Score",
                  "PMCA Category",
-                 "Age at first Bayleys",
+                 "Age at first BSID",
                  "Age at first encounter")
 des_cat_vars <- c("Sex","Gestational_Class", "V3_RACE","coi_cat","PMCA_birth")
 
@@ -1243,6 +1255,93 @@ d_T1_GA <- d_T1_GA %>%
 #          file = "/Users/emily/projects/research/ADOR/CHLA_clean/outputs/tables/Table1_April12.html")
 d_T1_GA
 ```
+
+Stats for the table above: 
+
+```{r}
+GA_diff_PMCA <- chisq.test(table(descrip_table$Gestational_Class, descrip_table$PMCA_birth))
+coi_cat_diff_PMCA <- chisq.test(table(descrip_table$coi_cat, descrip_table$PMCA_birth))
+
+# Standardized residuals
+GA_diff_PMCA$stdres
+coi_cat_diff_PMCA$stdres
+
+#devtools::install_github("ebbertd/chisq.posthoc.test")
+library(chisq.posthoc.test)
+chisq.posthoc.test(table(descrip_table$Gestational_Class, descrip_table$PMCA_birth),method = "bonferroni")
+chisq.posthoc.test(table(descrip_table$coi_cat, descrip_table$PMCA_birth),method = "bonferroni")
+```
+
+Make term and preterm datasets
+```{r}
+term = meta_mod2 %>% dplyr::filter(GA_combined2 > 37)
+preterm = meta_mod2 %>% dplyr::filter(GA_combined2 <= 37)
+```
+
+Repeat Table 2 for just Term 
+
+```{r}
+# Model for the cog score
+cog_model <- lm(Cognitive_Composite_Score ~ PMCA_birth + r_coi_nat + GA_combined2 + Sex, 
+                      data=term)
+# Model for the motor score
+motor_model <- lm(Motor_Composite_Score ~ PMCA_birth + r_coi_nat + GA_combined2 + Sex, 
+                       data=term)
+# Model for the language score
+language_model <- lm(Lang_Composite_Score ~ PMCA_birth + r_coi_nat + GA_combined2 + Sex, 
+                          data=term)
+
+sjPlot::tab_model(cog_model,motor_model,language_model,
+                  title = "Developemental scores across PMCA, COI, Gestational Age and Sex in Term Infants",
+                  string.pred = "Predictors",
+                  string.est = "Estimate",
+                  string.std = "std. Beta",
+                  string.ci = "95% CI",
+                  string.se = "std. Error",
+                  p.style = c("numeric"), 
+                  p.threshold = c(0.05),
+                  dv.labels = c("Cognitive Score", "Motor Score", "Language Score"),
+                  auto.label = FALSE,
+                  pred.labels = c("Intercept (PMCA Non-chronic)", 
+                                  "PMCA Non-complex Chronic",                                  
+                                  "PMCA Complex Chronic", 
+                                  "Child Opp. Index",
+                                  "Sex, Male",
+                                  "Gestational Age"))
+```
+
+Repeat Table 2 for just Preterm
+
+```{r}
+# Model for the cog score
+cog_model <- lm(Cognitive_Composite_Score ~ PMCA_birth + r_coi_nat + GA_combined2 + Sex, 
+                      data=preterm)
+# Model for the motor score
+motor_model <- lm(Motor_Composite_Score ~ PMCA_birth + r_coi_nat + GA_combined2 + Sex, 
+                       data=preterm)
+# Model for the language score
+language_model <- lm(Lang_Composite_Score ~ PMCA_birth + r_coi_nat + GA_combined2 + Sex, 
+                          data=preterm)
+
+sjPlot::tab_model(cog_model,motor_model,language_model,
+                  title = "Developemental scores across PMCA, COI, Gestational Age and Sex in Preterm Infants",
+                  string.pred = "Predictors",
+                  string.est = "Estimate",
+                  string.std = "std. Beta",
+                  string.ci = "95% CI",
+                  string.se = "std. Error",
+                  p.style = c("numeric"), 
+                  p.threshold = c(0.05),
+                  dv.labels = c("Cognitive Score", "Motor Score", "Language Score"),
+                  auto.label = FALSE,
+                  pred.labels = c("Intercept (PMCA Non-chronic)", 
+                                  "PMCA Non-complex Chronic",                                  
+                                  "PMCA Complex Chronic", 
+                                  "Child Opp. Index",
+                                  "Sex, Male",
+                                  "Gestational Age"))
+```
+
 
 # 3. Age at Bayleys across PMCA groups
 

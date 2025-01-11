@@ -651,17 +651,21 @@ Make a table comparing those who do vs. dont have Bayleys scores
 ```{r}
 # which vars to include 
 descrip_vars <- c("Sex", "GA_combined2",
+                  "Gestational_Class",
                   "V3_RACE",
                   "coi_cat",
+                  "r_coi_nat",
                   "pmca_first", 
                   "has_bay")
 desc_labels <- c("Sex","Gestational Age",
+                 "Gestational Class"
                  "Race and/or Ethnicity",
-                 "Child Opp Index",
+                 "Child Opp Index Ranks",
+                 "Child Opp Index Score",
                  "PMCA Category",
                  "Did they have Bayleys")
 
-des_cat_vars <- c("Sex","V3_RACE","coi_cat","pmca_first", "has_bay")
+des_cat_vars <- c("Sex","Gestational_Class","V3_RACE","coi_cat","pmca_first", "has_bay")
 
 descrip_table <- dplyr::select(both_unique, one_of(descrip_vars))
 
