@@ -22,7 +22,8 @@ pacman::p_load(knitr, tidyverse, magrittr, lme4, lmerTest, GGally, corrplot,
 #load("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/clean_inputs/aapril11/meta_bay_april11.RData")
 load("/Users/emily/projects/research/ADOR/CHLA_clean/clean_inputs/meta_bay_april11.RData")
 #ages <- fread("/Users/emily/projects/research/ADOR/CHLAneuro/Output/enc_bayley_ages_first_0618.csv")
-ages <- fread("/Users/emily/projects/research/ADOR/CHLAneuro/Output/enc_bayley_ages_first_0705.csv")
+#ages <- fread("/Users/emily/projects/research/ADOR/CHLAneuro/Output/enc_bayley_ages_first_0705.csv")
+ages <- fread("/Volumes/IPHY/ADORLab/Lab\ Projects/CHLAneuro/CHLAclean/clean_inputs/aapril11/enc_bayley_ages_first_0705.csv")
 ```
 
 ```{r make no NA data frames}
